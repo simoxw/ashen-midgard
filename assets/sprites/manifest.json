@@ -1,0 +1,11 @@
+{
+  "enabled": [],
+  "available": [
+    "hero",
+    "enemy_swarm",
+    "enemy_tank",
+    "boss",
+    "ground_tile",
+    "prop_tree"
+  ]
+}

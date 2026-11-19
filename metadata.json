@@ -1,0 +1,6 @@
+{
+  "name": "Ashen Midgard",
+  "description": "Gioco 2.5D Survivors-like / Bullet Heaven ottimizzato per smartphone verticali e installabile offline come Progressive Web App.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

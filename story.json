@@ -1,0 +1,218 @@
+{
+  "onGameStart": [
+    {
+      "speaker": "Astrid, Figlia del Tuono",
+      "text": "Le fiamme di Yggdrasil si sono spente. Sulle distese cenere di Midgard, i morti camminano ancora sotto l'aurora.",
+      "image": "./assets/story/intro.jpg",
+      "effect": "kenBurnsIn",
+      "particles": "embers"
+    },
+    {
+      "speaker": "Astrid, Figlia del Tuono",
+      "text": "Stringi l'ascia runica, sopravvissuto. Resisti all'orda per quattro minuti finché il Signore del Gelo non mostrerà il suo volto.",
+      "image": "./assets/story/intro.jpg",
+      "effect": "kenBurnsPan",
+      "particles": "embers"
+    }
+  ],
+  "onBossSpawn": [
+    {
+      "speaker": "Araldo del Gelo",
+      "text": "La terra trema sotto passi colossali. Le antiche rune si spezzano: Hrimthurs degli Jotun è giunto per reclamare il tuo spirito!",
+      "image": "./assets/story/boss.jpg",
+      "effect": "kenBurnsIn",
+      "particles": "frost"
+    },
+    {
+      "speaker": "Voce delle Rune",
+      "text": "Osserva il terreno! Evita i cerchi scarlatti prima che il suo maglio di ghiaccio frantumi la piana.",
+      "image": "./assets/story/boss.jpg",
+      "effect": "kenBurnsPan",
+      "particles": "frost"
+    }
+  ],
+  "onVictory": [
+    {
+      "speaker": "Cronache del Valhalla",
+      "text": "Con un ultimo fendente runico la corona del Gigante di Brina va in frantumi. Le nubi si squarciano lasciando spazio a un'alba d'oro.",
+      "image": "./assets/story/victory.jpg",
+      "effect": "kenBurnsIn",
+      "particles": "embers"
+    },
+    {
+      "speaker": "Astrid, Figlia del Tuono",
+      "text": "Midgard respira ancora. Il tuo nome sarà cantato nelle sale degli Einherjar fino alla fine dei tempi.",
+      "image": "./assets/story/victory.jpg",
+      "effect": "kenBurnsPan",
+      "particles": "embers"
+    }
+  ],
+  "onGameOver": [
+    {
+      "speaker": "Eco del Fimbulvetr",
+      "text": "Lo scudo si spezza sotto il peso dell'orda infinita. La neve ricopre lentamente le tue rune ormai fredde.",
+      "image": "./assets/story/gameover.jpg",
+      "effect": "kenBurnsIn",
+      "particles": "frost"
+    },
+    {
+      "speaker": "Voce delle Norne",
+      "text": "Ma il filo del destino non è ancora reciso. Rialzati, tempra nuove armi e torna a sfidare l'inverno eterno.",
+      "image": "./assets/story/gameover.jpg",
+      "effect": "kenBurnsPan",
+      "particles": "frost"
+    }
+  ],
+  "heroes": {
+    "warrior": {
+      "onGameStart": [
+        {
+          "speaker": "Astrid, Figlia del Tuono",
+          "text": "Le fiamme di Yggdrasil si sono spente. Sulle distese cenere di Midgard, i morti camminano ancora sotto l'aurora.",
+          "image": "./assets/story/intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Astrid, Figlia del Tuono",
+          "text": "Stringi l'ascia runica, guerriera. Resisti all'orda per quattro minuti finché il Signore del Gelo non mostrerà il suo volto.",
+          "image": "./assets/story/intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Cronache del Valhalla",
+          "text": "Con un ultimo fendente runico la corona del Gigante di Brina va in frantumi. Le nubi si squarciano lasciando spazio a un'alba d'oro.",
+          "image": "./assets/story/victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Astrid, Figlia del Tuono",
+          "text": "Midgard respira ancora. Il tuo nome sarà cantato nelle sale degli Einherjar fino alla fine dei tempi.",
+          "image": "./assets/story/victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco del Fimbulvetr",
+          "text": "Lo scudo si spezza sotto il peso dell'orda infinita. La neve ricopre lentamente le tue rune ormai fredde.",
+          "image": "./assets/story/gameover.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "frost"
+        },
+        {
+          "speaker": "Voce delle Norne",
+          "text": "Ma il filo del destino non è ancora reciso. Rialzati, tempra nuove armi e torna a sfidare l'inverno eterno.",
+          "image": "./assets/story/gameover.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "frost"
+        }
+      ]
+    },
+    "assassin": {
+      "onGameStart": [
+        {
+          "speaker": "Skadi, Lama dell'Ombra",
+          "text": "Dalla rupe di basalto osservo le rovine fumanti sotto l'aurora. Nessun Draugr sfugge allo sguardo della notte.",
+          "image": "./assets/story/skadi_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Skadi, Lama dell'Ombra",
+          "text": "I pugnali runici hanno sete di ghiaccio e sangue. Danza tra le ombre per quattro minuti e colpisci il cuore di Hrimthurs.",
+          "image": "./assets/story/skadi_intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Skadi, Lama dell'Ombra",
+          "text": "Anche il colosso di brina aveva un punto debole. I suoi cristalli giacciono infranti sotto i miei stivali mentre sorge l'alba.",
+          "image": "./assets/story/skadi_victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Sussurri di Niflheim",
+          "text": "Le ombre tacciono in segno di rispetto: nessuna leggenda è più rapida della lama che ha abbattuto l'inverno.",
+          "image": "./assets/story/skadi_victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco del Fimbulvetr",
+          "text": "Il mantello viola scompare sotto la bufera. Le lame gemelle si spezzano accanto alla stele antica.",
+          "image": "./assets/story/skadi_gameover.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "frost"
+        },
+        {
+          "speaker": "Skadi, Lama dell'Ombra",
+          "text": "Un'ombra non muore mai davvero nel gelo. Tornerò più veloce, più letale, e il tuo trono cadrà.",
+          "image": "./assets/story/skadi_gameover.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "frost"
+        }
+      ]
+    },
+    "mage": {
+      "onGameStart": [
+        {
+          "speaker": "Freya, Custode delle Rune",
+          "text": "I sigilli di Midgard vacillano tra i pini innevati. Richiamo le sfere di gelo e folgore dal cuore dell'antico sapere.",
+          "image": "./assets/story/freya_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "frost"
+        },
+        {
+          "speaker": "Freya, Custode delle Rune",
+          "text": "Alimenta il tuo potere arcano per quattro minuti: quando il Signore del Gelo varcherà la soglia, le sue stesse tempeste gli si rivolteranno contro.",
+          "image": "./assets/story/freya_intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "frost"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Freya, Custode delle Rune",
+          "text": "Con l'ultima invocazione le rune si ricompongono nel cielo. La tempesta si dissolve in luce dorata sull'altare di ghiaccio.",
+          "image": "./assets/story/freya_victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Cronache Arcane",
+          "text": "Il sapere dei Vanir ha prevalso sulla furia cieca degli Jotun. La tua magia proteggerà i Nove Regni.",
+          "image": "./assets/story/freya_victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco del Fimbulvetr",
+          "text": "Il cristallo del bastone si incrina nella tormenta e l'ultimo bagliore ciano si spegne nella neve profonda.",
+          "image": "./assets/story/freya_gameover.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "frost"
+        },
+        {
+          "speaker": "Freya, Custode delle Rune",
+          "text": "Le rune attendono solo una scintilla per ridestarsi. Raccogli la mia eco e riscrivi questo incantesimo.",
+          "image": "./assets/story/freya_gameover.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "frost"
+        }
+      ]
+    }
+  }
+}
