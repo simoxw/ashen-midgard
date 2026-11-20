@@ -24,6 +24,14 @@ import {
   loadCodexState,
   recordRunCodexProgress
 } from './codex.js';
+import {
+  REALM_CATALOG,
+  REALM_ORDER,
+  getRealmConfig,
+  loadRealmProgress,
+  saveRealmProgress,
+  recordRealmVictory
+} from './realms.js';
 
 const RECORDS_STORAGE_KEY = 'ashen_midgard_records_v1';
 
@@ -94,6 +102,7 @@ const el = {
   titleScreen: document.getElementById('title-screen'),
   playBtn: document.getElementById('play-btn'),
   titleMuteBtn: document.getElementById('title-mute-btn'),
+  realmSelectorList: document.getElementById('realm-selector-list'),
   heroSelectorGrid: document.getElementById('hero-selector-grid'),
   heroDetailPanel: document.getElementById('hero-detail-panel'),
   selectedHeroDesc: document.getElementById('selected-hero-desc'),
@@ -114,6 +123,11 @@ const el = {
   hudBuildStrip: document.getElementById('hud-build-strip'),
   hudBuffBar: document.getElementById('hud-buff-bar'),
   pauseBtn: document.getElementById('pause-btn'),
+
+  inrunDialogue: document.getElementById('inrun-dialogue'),
+  inrunDialogueSpeaker: document.getElementById('inrun-dialogue-speaker'),
+  inrunDialogueRole: document.getElementById('inrun-dialogue-role'),
+  inrunDialogueText: document.getElementById('inrun-dialogue-text'),
 
   bossHud: document.getElementById('boss-hud'),
   bossName: document.getElementById('boss-name'),
@@ -159,6 +173,8 @@ const el = {
   endMetaLevelUp: document.getElementById('end-meta-levelup'),
   endMetaUnlocks: document.getElementById('end-meta-unlocks'),
   endCodexUnlocks: document.getElementById('end-codex-unlocks'),
+  endRealmUnlock: document.getElementById('end-realm-unlock'),
+  nextRealmBtn: document.getElementById('next-realm-btn'),
   playAgainBtn: document.getElementById('play-again-btn'),
   endTitleBtn: document.getElementById('end-title-btn'),
 
@@ -253,6 +269,8 @@ function setupPwaExperience() {
 // Avvio principale al caricamento DOM
 window.addEventListener('DOMContentLoaded', async () => {
   let metaState = loadMetaProgress();
+  let realmState = loadRealmProgress(loadRecords());
+  let pendingNextRealmId = null;
 
   const buildRunConfig = () => {
     const heroId = HERO_ROSTER[metaState.selectedHero] ? metaState.selectedHero : 'warrior';
@@ -263,12 +281,62 @@ window.addEventListener('DOMContentLoaded', async () => {
     const startingWeaponId = perks.unlockedWeapons.includes(storedWep)
       ? storedWep
       : hero.weapons[0].id;
+    const realmId = realmState.unlockedRealms.includes(realmState.selectedRealm)
+      ? realmState.selectedRealm
+      : 'midgard';
     return {
       heroId,
       startingWeaponId,
       textureKey: hero.textureKey,
-      effectiveStats: perks
+      effectiveStats: perks,
+      realmId
     };
+  };
+
+  const renderRealmSelection = () => {
+    realmState = loadRealmProgress(loadRecords());
+    if (!el.realmSelectorList) return;
+    el.realmSelectorList.innerHTML = '';
+
+    REALM_ORDER.forEach((rId) => {
+      const realm = REALM_CATALOG[rId];
+      const unlocked = realmState.unlockedRealms.includes(rId);
+      const selected = unlocked && realmState.selectedRealm === rId;
+      const clearedCount = realmState.clearedRealms?.[rId] || 0;
+      const xpPct = Math.round((realm.xpBonusMult - 1) * 100);
+
+      let metaLabel = 'Bloccato';
+      if (unlocked) {
+        if (clearedCount > 0) {
+          metaLabel = xpPct > 0 ? `Completato · +${xpPct}% EXP` : 'Completato';
+        } else {
+          metaLabel = xpPct > 0 ? `Disponibile · +${xpPct}% EXP` : 'Disponibile';
+        }
+      }
+
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `realm-card${selected ? ' is-selected' : ''}${unlocked ? '' : ' is-locked'}`;
+      card.disabled = !unlocked;
+      card.style.setProperty('--realm-accent', realm.accent);
+      card.setAttribute('aria-pressed', String(selected));
+      if (!unlocked) card.title = realm.unlockHint;
+      card.innerHTML = `
+        <span class="realm-card-order">AREA ${realm.order}</span>
+        <span class="realm-card-name">${realm.name}</span>
+        <span class="realm-card-meta">${metaLabel}</span>
+      `;
+      if (unlocked) {
+        card.addEventListener('click', () => {
+          audio.unlock();
+          audio.playUiClick();
+          realmState.selectedRealm = rId;
+          saveRealmProgress(realmState);
+          renderRealmSelection();
+        });
+      }
+      el.realmSelectorList.appendChild(card);
+    });
   };
 
   const renderHeroSelection = () => {
@@ -425,6 +493,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  renderRealmSelection();
   renderHeroSelection();
   renderTitleRecords();
   updateCodexButtonLabel();
@@ -434,6 +503,59 @@ window.addEventListener('DOMContentLoaded', async () => {
   const storyManager = new StoryManager(audio);
   await storyManager.load('./story.json');
 
+  let dialogueQueue = [];
+  let dialogueShowing = false;
+  let dialogueHideTimer = null;
+  let dialogueFadeTimer = null;
+
+  const clearDialogueQueue = () => {
+    dialogueQueue = [];
+    dialogueShowing = false;
+    if (dialogueHideTimer) {
+      clearTimeout(dialogueHideTimer);
+      dialogueHideTimer = null;
+    }
+    if (dialogueFadeTimer) {
+      clearTimeout(dialogueFadeTimer);
+      dialogueFadeTimer = null;
+    }
+    if (el.inrunDialogue) {
+      el.inrunDialogue.classList.remove('is-visible');
+      el.inrunDialogue.classList.add('hidden');
+    }
+  };
+
+  const pumpDialogueQueue = () => {
+    if (dialogueShowing || dialogueQueue.length === 0 || !el.inrunDialogue) return;
+    const dlg = dialogueQueue.shift();
+    dialogueShowing = true;
+
+    if (el.inrunDialogueSpeaker) {
+      el.inrunDialogueSpeaker.textContent = dlg.speaker || 'Voce Runica';
+      el.inrunDialogueSpeaker.style.color = dlg.accent || '#f59e0b';
+    }
+    if (el.inrunDialogueRole) {
+      el.inrunDialogueRole.textContent = dlg.role || '';
+    }
+    if (el.inrunDialogueText) {
+      el.inrunDialogueText.textContent = dlg.text || '';
+    }
+    el.inrunDialogue.style.borderColor = `${dlg.accent || '#f59e0b'}55`;
+    el.inrunDialogue.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      el.inrunDialogue?.classList.add('is-visible');
+    });
+
+    dialogueHideTimer = setTimeout(() => {
+      el.inrunDialogue?.classList.remove('is-visible');
+      dialogueFadeTimer = setTimeout(() => {
+        el.inrunDialogue?.classList.add('hidden');
+        dialogueShowing = false;
+        pumpDialogueQueue();
+      }, 220);
+    }, 3900);
+  };
+
   const gameScene = new GameScene();
 
   // Bridge eventi tra Phaser GameScene e Overlay HTML/CSS
@@ -441,6 +563,13 @@ window.addEventListener('DOMContentLoaded', async () => {
     onSceneReady() {
       // Abilita pulsante GIOCA una volta pronte le texture procedurali
       if (el.playBtn) el.playBtn.disabled = false;
+    },
+
+    onDialogue(dlg) {
+      if (!dlg || !dlg.text) return;
+      if (dialogueQueue.length >= 2) dialogueQueue.shift();
+      dialogueQueue.push(dlg);
+      pumpDialogueQueue();
     },
 
     onHudUpdate(data) {
@@ -477,8 +606,9 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
     },
 
-    onBossWarning(active) {
+    onBossWarning(active, warningText) {
       if (!el.bossWarning) return;
+      if (warningText) el.bossWarning.textContent = warningText;
       el.bossWarning.classList.toggle('hidden', !active);
     },
 
@@ -584,10 +714,20 @@ window.addEventListener('DOMContentLoaded', async () => {
     },
 
     onRunEnded(result) {
-      const { isNewRecord } = saveRecords(result);
+      clearDialogueQueue();
+      const { records, isNewRecord } = saveRecords(result);
       const metaUpdate = grantHeroMetaXp(result.heroId || metaState.selectedHero, result);
       metaState = metaUpdate.meta;
+
+      const realmCfg = getRealmConfig(result.realmId || realmState.selectedRealm);
+      let realmOutcome = { progress: realmState, newlyUnlockedRealmId: null };
+      if (result.victory) {
+        realmOutcome = recordRealmVictory(realmCfg.id, records);
+        realmState = realmOutcome.progress;
+      }
+
       const codexUpdate = recordRunCodexProgress(result);
+      renderRealmSelection();
       renderTitleRecords();
       renderHeroSelection();
       updateCodexButtonLabel();
@@ -597,14 +737,41 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (el.hudBuffBar) el.hudBuffBar.classList.add('hidden');
 
       if (el.endTitle) {
-        el.endTitle.textContent = result.victory ? 'VITTORIA A MIDGARD' : 'CADUTO NELL’INVERNO';
+        el.endTitle.textContent = result.victory
+          ? realmCfg.victoryTitle
+          : `CADUTO A ${realmCfg.name.toUpperCase()}`;
         el.endTitle.classList.toggle('is-victory', result.victory);
       }
       if (el.endSubtitle) {
         el.endSubtitle.textContent = result.victory
-          ? 'Hrimthurs è stato abbattuto. Le rune brillano ancora.'
+          ? realmCfg.victorySub
           : 'L’orda ti ha sopraffatto, ma il Valhalla attende la tua rivincita.';
       }
+      if (el.endRealmUnlock) {
+        if (result.victory && realmOutcome.newlyUnlockedRealmId) {
+          const unlockedCfg = getRealmConfig(realmOutcome.newlyUnlockedRealmId);
+          el.endRealmUnlock.textContent = `Nuovo Regno Sbloccato: ${unlockedCfg.fullName}!`;
+          el.endRealmUnlock.classList.remove('hidden');
+        } else {
+          el.endRealmUnlock.classList.add('hidden');
+        }
+      }
+
+      pendingNextRealmId = result.victory && realmCfg.nextRealmId ? realmCfg.nextRealmId : null;
+      if (el.nextRealmBtn && el.playAgainBtn) {
+        if (pendingNextRealmId) {
+          const nextCfg = getRealmConfig(pendingNextRealmId);
+          el.nextRealmBtn.textContent = `PROSEGUI A ${nextCfg.name.toUpperCase()}`;
+          el.nextRealmBtn.classList.remove('hidden');
+          el.playAgainBtn.className = 'btn-secondary';
+          el.playAgainBtn.textContent = `Rigioca ${realmCfg.name}`;
+        } else {
+          el.nextRealmBtn.classList.add('hidden');
+          el.playAgainBtn.className = 'btn-primary';
+          el.playAgainBtn.textContent = 'GIOCA ANCORA';
+        }
+      }
+
       if (el.endNewRecord) {
         el.endNewRecord.classList.toggle('hidden', !isNewRecord);
       }
@@ -702,6 +869,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const startGameFlow = async () => {
     audio.unlock();
     audio.playUiClick();
+    clearDialogueQueue();
     el.titleScreen?.classList.add('hidden');
     el.endModal?.classList.add('hidden');
     el.endModal?.classList.remove('flex');
@@ -719,6 +887,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   el.playBtn?.addEventListener('click', startGameFlow);
   el.playAgainBtn?.addEventListener('click', startGameFlow);
+  el.nextRealmBtn?.addEventListener('click', async () => {
+    if (!pendingNextRealmId || !REALM_CATALOG[pendingNextRealmId]) {
+      await startGameFlow();
+      return;
+    }
+    realmState.selectedRealm = pendingNextRealmId;
+    saveRealmProgress(realmState);
+    renderRealmSelection();
+    await startGameFlow();
+  });
 
   el.codexBtn?.addEventListener('click', () => {
     audio.unlock();
@@ -770,6 +948,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const returnToTitle = () => {
     audio.playUiClick();
+    clearDialogueQueue();
     el.pauseModal?.classList.add('hidden');
     el.pauseModal?.classList.remove('flex');
     el.endModal?.classList.add('hidden');
@@ -782,6 +961,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.titleScreen?.classList.remove('hidden');
     gameScene.gameState = 'IDLE';
     gameScene.physics.pause();
+    renderRealmSelection();
     renderHeroSelection();
     renderTitleRecords();
     updateCodexButtonLabel();

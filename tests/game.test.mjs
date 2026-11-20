@@ -253,7 +253,8 @@ const {
   getHeroLevelFromXp,
   getPerksForHeroLevel,
   loadMetaProgress,
-  grantHeroMetaXp
+  grantHeroMetaXp,
+  computeRunMetaXp
 } = await import('../src/heroes.js');
 const {
   CODEX_ENTRIES,
@@ -261,6 +262,15 @@ const {
   getCodexView,
   recordRunCodexProgress
 } = await import('../src/codex.js');
+const {
+  REALM_STORAGE_KEY,
+  REALM_ORDER,
+  REALM_CATALOG,
+  getRealmConfig,
+  getRealmDialogue,
+  loadRealmProgress,
+  recordRealmVictory
+} = await import('../src/realms.js');
 
 test('2.5D Depth Layers: entità sempre sopra terreno e ombre anche con Y negative', () => {
   const testYs = [-100000, -1500, -250, -1, 0, 1, 250, 1500, 100000];
@@ -454,11 +464,31 @@ test('Config PWA & Story: manifest.json, story.json e file statici presenti', ()
       }
     }
   }
+
+  // Verifica storie e immagini per i Regni Muspelheim & Helheim
+  for (const realmId of ['muspelheim', 'helheim']) {
+    const realmStory = story.realms?.[realmId];
+    assert.ok(realmStory, `Storia regno mancante: ${realmId}`);
+    for (const trigger of ['onGameStart', 'onBossSpawn', 'onVictory', 'onGameOver']) {
+      assert.ok(Array.isArray(realmStory[trigger]) && realmStory[trigger].length > 0, `Slide ${realmId}.${trigger} mancante`);
+      for (const slide of realmStory[trigger]) {
+        const imgPath = path.join(root, slide.image.replace(/^\.\//, ''));
+        assert.equal(fs.existsSync(imgPath), true, `Immagine ${realmId} mancante: ${slide.image}`);
+      }
+    }
+  }
+
   // Verifica strategia aggiornamento forzato SW (Network-First per codice/HTML + updateViaCache: none)
   const swSource = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   assert.ok(swSource.includes('networkFirst'), 'sw.js deve usare networkFirst per codice e HTML');
   assert.ok(swSource.includes("cache: 'reload'"), 'sw.js deve bypassare HTTP cache in installazione');
   assert.ok(swSource.includes('./src/codex.js') && swSource.includes('./assets/story/bjorn_intro.jpg'), 'sw.js deve pre-caricare codex.js e immagini storia di Bjorn');
+  assert.ok(
+    swSource.includes('./src/realms.js') &&
+      swSource.includes('./assets/story/boss_surtr.jpg') &&
+      swSource.includes('./assets/story/boss_hel.jpg'),
+    'sw.js deve pre-caricare realms.js e le vignette di Muspelheim/Helheim'
+  );
   const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.ok(htmlSource.includes("updateViaCache: 'none'"), 'index.html deve registrare SW con updateViaCache: none');
   assert.ok(htmlSource.includes('controllerchange'), 'index.html deve gestire reload su controllerchange');
@@ -516,7 +546,9 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
     'prop_tree', 'prop_rock', 'prop_brazier', 'prop_crate', 'prop_shrine',
     'chest_valhalla', 'frost_arrow', 'meat_pickup', 'magnet_pickup', 'shadow_ellipse',
     'axe_proj', 'dagger_proj', 'orb_proj', 'blade_proj',
-    'gem_blue', 'gem_green', 'gem_gold'
+    'gem_blue', 'gem_green', 'gem_gold',
+    'ground_tile_muspel', 'enemy_muspel_swarm', 'enemy_muspel_swarm_f1', 'boss_surtr', 'boss_surtr_f2', 'fire_bolt',
+    'ground_tile_hel', 'enemy_hel_swarm', 'enemy_hel_swarm_f1', 'boss_hel', 'boss_hel_f2', 'shadow_bolt'
   ]) {
     assert.equal(registered.has(expectedKey), true, `Sprite HD 4x mancante: ${expectedKey}`);
   }
@@ -528,18 +560,25 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
   assert.deepEqual(registered.get('enemy_fast'), { width: 144, height: 112 });
   assert.deepEqual(registered.get('enemy_tank'), { width: 168, height: 192 });
   assert.deepEqual(registered.get('boss'), { width: 280, height: 320 });
+  assert.deepEqual(registered.get('boss_surtr'), { width: 280, height: 320 });
+  assert.deepEqual(registered.get('boss_hel'), { width: 280, height: 320 });
 
   const root = process.cwd();
   const story = JSON.parse(fs.readFileSync(path.join(root, 'story.json'), 'utf8'));
   const sm = new StoryManager(audio);
   sm.storyData = story;
 
-  const skadiStart = sm.getSlidesFor('onGameStart', 'assassin');
+  const skadiStart = sm.getSlidesFor('onGameStart', 'assassin', 'midgard');
   assert.equal(skadiStart[0].image, './assets/story/skadi_intro.jpg');
-  const freyaVictory = sm.getSlidesFor('onVictory', 'mage');
+  const freyaVictory = sm.getSlidesFor('onVictory', 'mage', 'midgard');
   assert.equal(freyaVictory[0].image, './assets/story/freya_victory.jpg');
-  const bossSlides = sm.getSlidesFor('onBossSpawn', 'assassin');
+  const bossSlides = sm.getSlidesFor('onBossSpawn', 'assassin', 'midgard');
   assert.equal(bossSlides[0].image, './assets/story/boss.jpg');
+
+  const muspelBossSlides = sm.getSlidesFor('onBossSpawn', 'warrior', 'muspelheim');
+  assert.equal(muspelBossSlides[0].image, './assets/story/boss_surtr.jpg');
+  const helVictorySlides = sm.getSlidesFor('onVictory', 'mage', 'helheim');
+  assert.equal(helVictorySlides[0].image, './assets/story/helheim_victory.jpg');
 });
 
 test('Heroes & Meta-Progression: 4 eroi, armi sbloccabili e EXP permanente', () => {
@@ -864,4 +903,159 @@ test('Espansione Gameplay: Bjorn + Martello Sismico, Evoluzioni, Mini-Boss/Forzi
 
   globalThis.document = prevDoc;
 });
+
+test('Campagna Multi-Regno (Muspelheim/Surtr & Helheim/Hel), Dialoghi In-Run & Sblocchi', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  // 1. Progressione Regni, migrazione vecchi salvataggi e bonus EXP
+  assert.deepEqual(REALM_ORDER, ['midgard', 'muspelheim', 'helheim']);
+  localStorage.removeItem(REALM_STORAGE_KEY);
+  const freshRealms = loadRealmProgress(null);
+  assert.deepEqual(freshRealms.unlockedRealms, ['midgard']);
+
+  // Migrazione automatica per chi aveva già sconfitto Hrimthurs
+  const migratedRealms = loadRealmProgress({ bossesSlain: 1 });
+  assert.equal(migratedRealms.unlockedRealms.includes('muspelheim'), true);
+
+  const muspelUnlock = recordRealmVictory('muspelheim', { bossesSlain: 1 });
+  assert.equal(muspelUnlock.newlyUnlockedRealmId, 'helheim');
+  assert.equal(muspelUnlock.progress.unlockedRealms.includes('helheim'), true);
+  assert.equal(getRealmConfig('helheim').boss.id, 'hel');
+
+  const xpBase = computeRunMetaXp({ elapsedSec: 120, kills: 100, bossDefeated: true, xpBonusMult: 1.0 });
+  const xpMuspel = computeRunMetaXp({ elapsedSec: 120, kills: 100, bossDefeated: true, xpBonusMult: 1.25 });
+  assert.ok(xpMuspel > xpBase, 'Muspelheim deve assegnare bonus EXP +25%');
+
+  const dlgHero = getRealmDialogue('muspelheim', 'wave_1', 'assassin');
+  assert.equal(dlgHero.speaker, 'Skadi');
+  const dlgSurtr = getRealmDialogue('muspelheim', 'boss_enter', 'warrior');
+  assert.equal(dlgSurtr.speaker, 'Surtr');
+
+  // 2. Partita a Muspelheim: terreno lavico, nemici fire, dialoghi in-run, Surtr e meteoriti/fire_bolt
+  const scene = new GameScene();
+  const dialogues = [];
+  const warnings = [];
+  let lastEndResult = null;
+  let lastBossHud = null;
+
+  scene.configureBridge(
+    {
+      onDialogue: (d) => dialogues.push(d),
+      onBossWarning: (active, txt) => warnings.push({ active, txt }),
+      onBossHudUpdate: (b) => { lastBossHud = b; },
+      onRunEnded: (r) => { lastEndResult = r; }
+    },
+    null
+  );
+  scene.preload();
+  scene.create();
+
+  await scene.startNewRun({
+    heroId: 'warrior',
+    startingWeaponId: 'axe',
+    textureKey: 'hero_warrior',
+    realmId: 'muspelheim'
+  });
+
+  assert.equal(scene.activeRealmId, 'muspelheim');
+  assert.equal(scene.ground.texture, 'ground_tile_muspel');
+
+  // Trigger ondate 1, 3, 5 e primo Mini-Boss -> dialoghi brevi emessi senza duplicati
+  scene.elapsedSec = 31;
+  scene.update(1000, 16);
+  scene.elapsedSec = 91;
+  scene.update(2000, 16);
+  scene.elapsedSec = 151;
+  scene.update(3000, 16);
+  scene._spawnMiniBoss(0);
+
+  assert.equal(dialogues.some((d) => d.triggerKey === 'wave_1'), true);
+  assert.equal(dialogues.some((d) => d.triggerKey === 'wave_3'), true);
+  assert.equal(dialogues.some((d) => d.triggerKey === 'wave_5'), true);
+  assert.equal(dialogues.some((d) => d.triggerKey === 'miniboss_0'), true);
+
+  // Spawn nemico Muspelheim -> texture dedicata & HP scalati +35%
+  scene._spawnEnemy('swarm', 0, 0, 140);
+  const muspelSwarm = scene.activeEnemies.find((e) => e.archetype === 'swarm');
+  assert.equal(muspelSwarm.texture, 'enemy_muspel_swarm');
+  assert.ok(muspelSwarm.maxHp >= 43, `HP Muspelheim atteso >= 43, ricevuto ${muspelSwarm.maxHp}`);
+
+  // Trigger sequenza Surtr (warning, boss_enter, telegrafi fuoco + fase 50% HP + victory payload)
+  await scene._triggerBossSequence();
+  assert.equal(scene.bossSprite.texture, 'boss_surtr');
+  assert.equal(lastBossHud.name, 'Surtr, Signore delle Braci');
+  assert.equal(warnings.some((w) => w.active && w.txt.includes('SURTR')), true);
+  assert.equal(dialogues.some((d) => d.triggerKey === 'boss_enter' && d.speaker === 'Surtr'), true);
+
+  scene.timers.bossAttack = 0;
+  scene.update(11000, 33);
+  assert.ok(scene.activeTelegraphs.length >= 3, 'Surtr deve evocare pioggia di meteore telegrafata');
+  assert.equal(
+    scene.activeEnemyProjectiles.some((p) => p.texture === 'fire_bolt'),
+    true,
+    'Surtr deve scagliare una raffica radiale di fire_bolt'
+  );
+
+  // Porta Surtr sotto il 50% HP -> dialogo boss_half
+  scene._damageEnemy(scene.bossSprite, 4000, 1, 0, 0, false);
+  assert.equal(dialogues.some((d) => d.triggerKey === 'boss_half'), true);
+
+  // Sconfiggi Surtr -> risultato vittoria con realmId e xpBonusMult
+  scene._killEnemy(scene.bossSprite);
+  await new Promise((r) => setTimeout(r, 760));
+  assert.equal(lastEndResult?.victory, true);
+  assert.equal(lastEndResult?.realmId, 'muspelheim');
+  assert.equal(lastEndResult?.xpBonusMult, 1.25);
+
+  // 3. Partita ad Helheim: terreno spettrale, Hel e spirale di shadow_bolt
+  await scene.startNewRun({
+    heroId: 'mage',
+    startingWeaponId: 'orb',
+    textureKey: 'hero_mage',
+    realmId: 'helheim'
+  });
+  assert.equal(scene.ground.texture, 'ground_tile_hel');
+  scene._spawnBoss();
+  assert.equal(scene.bossSprite.texture, 'boss_hel');
+  scene.timers.bossAttack = 0;
+  scene.update(12000, 33);
+  assert.equal(
+    scene.activeEnemyProjectiles.some((p) => p.texture === 'shadow_bolt'),
+    true,
+    'Hel deve lanciare una spirale rotante di shadow_bolt'
+  );
+
+  // 4. Sblocco voci Codex per Muspelheim e Helheim
+  localStorage.removeItem(CODEX_STORAGE_KEY);
+  const muspelCodex = recordRunCodexProgress({
+    realmId: 'muspelheim',
+    heroId: 'warrior',
+    kills: 40,
+    elapsedSec: 245,
+    bossDefeated: true,
+    victory: true
+  });
+  const helCodex = recordRunCodexProgress({
+    realmId: 'helheim',
+    heroId: 'mage',
+    kills: 40,
+    elapsedSec: 245,
+    bossDefeated: true,
+    victory: true
+  });
+  const unlockedIds = new Set([
+    ...muspelCodex.newlyUnlocked.map((e) => e.id),
+    ...helCodex.newlyUnlocked.map((e) => e.id)
+  ]);
+  assert.equal(unlockedIds.has('enemy_muspel_legion'), true);
+  assert.equal(unlockedIds.has('enemy_muspel_boss'), true);
+  assert.equal(unlockedIds.has('enemy_hel_legion'), true);
+  assert.equal(unlockedIds.has('enemy_hel_boss'), true);
+  assert.equal(unlockedIds.has('lore_muspelheim'), true);
+  assert.equal(unlockedIds.has('lore_helheim'), true);
+
+  globalThis.document = prevDoc;
+});
+
 

@@ -7,6 +7,7 @@
 
 import { audio } from './audio.js';
 import { generateHdTextures } from './hdSprites.js';
+import { getRealmConfig, getRealmDialogue } from './realms.js';
 
 export const GAME_CONFIG = {
   // Durata della run prima dell'arrivo del Boss Finale (240s = 4 minuti)
@@ -308,6 +309,11 @@ export class GameScene extends Phaser.Scene {
 
     // 2. Stato iniziale
     this.gameState = 'IDLE'; // IDLE | PLAYING | PAUSED | LEVEL_UP | CUTSCENE | ENDED
+    this.activeRealmId = 'midgard';
+    this.activeRealm = getRealmConfig('midgard');
+    this.triggeredDialogues = new Set();
+    this.bossHalfHpTriggered = false;
+    this.bossAttackStep = 0;
     this.elapsedSec = 0;
     this.kills = 0;
     this.bossSpawned = false;
@@ -455,7 +461,7 @@ export class GameScene extends Phaser.Scene {
     this.physics.pause();
 
     if (this.storyManager) {
-      await this.storyManager.play('onGameStart', this.activeHeroId);
+      await this.storyManager.play('onGameStart', this.activeHeroId, this.activeRealmId);
     }
 
     this.gameState = 'PLAYING';
@@ -516,6 +522,17 @@ export class GameScene extends Phaser.Scene {
 
     this.activeHeroId = runConfig.heroId || 'warrior';
     this.activeWeaponId = runConfig.startingWeaponId || 'axe';
+    this.activeRealmId = runConfig.realmId || 'midgard';
+    this.activeRealm = getRealmConfig(this.activeRealmId);
+    this.triggeredDialogues = new Set();
+    this.bossHalfHpTriggered = false;
+    this.bossAttackStep = 0;
+
+    if (this.ground && this.textures.exists(this.activeRealm.groundKey)) {
+      this.ground.setTexture(this.activeRealm.groundKey);
+    }
+    this.cameras?.main?.setBackgroundColor?.(this.activeRealm.bgColor);
+
     const textureMap = {
       warrior: 'hero_warrior',
       assassin: 'hero_assassin',
@@ -621,11 +638,22 @@ export class GameScene extends Phaser.Scene {
       this._rebuildValkyrieBlades();
     }
 
+    this._applyRealmToDecalsAndProps();
     this._repositionAllDecals();
     this._repositionAllProps();
     this._repositionCratesAndShrines();
     this.bridge?.onBossHudUpdate?.(null);
     this._syncHud();
+  }
+
+  _emitDialogue(triggerKey) {
+    if (!this.triggeredDialogues) this.triggeredDialogues = new Set();
+    if (this.triggeredDialogues.has(triggerKey)) return;
+    this.triggeredDialogues.add(triggerKey);
+    const dlg = getRealmDialogue(this.activeRealmId, triggerKey, this.activeHeroId);
+    if (dlg) {
+      this.bridge?.onDialogue?.(dlg);
+    }
   }
 
   pauseGame(fromUi = false) {
@@ -746,10 +774,13 @@ export class GameScene extends Phaser.Scene {
     this._recycleDecalsAroundHero();
     this._recyclePropsAroundHero();
 
-    // 4. Ondate progressive ed eventi accerchiamento
+    // 4. Ondate progressive ed eventi accerchiamento + dialoghi brevi in partita
     const waveIdx = Math.floor(this.elapsedSec / GAME_CONFIG.WAVE_INTERVAL_SEC);
     if (waveIdx !== this.lastWaveIndex) {
       this.lastWaveIndex = waveIdx;
+      if (waveIdx === 1) this._emitDialogue('wave_1');
+      else if (waveIdx === 3) this._emitDialogue('wave_3');
+      else if (waveIdx === 5) this._emitDialogue('wave_5');
     }
 
     if (!this.bossSpawned && this.elapsedSec >= this.nextEncirclementSec) {
@@ -1002,14 +1033,8 @@ export class GameScene extends Phaser.Scene {
     const sx = this.hero.x + Math.cos(angle) * spawnDist;
     const sy = this.hero.y + Math.sin(angle) * spawnDist;
 
-    const texMap = {
-      tank: 'enemy_tank',
-      fast: 'enemy_fast',
-      archer: 'enemy_archer',
-      berserker: 'enemy_berserker',
-      swarm: 'enemy_swarm'
-    };
-    const texKey = texMap[archetype] || 'enemy_swarm';
+    const realm = this.activeRealm || getRealmConfig('midgard');
+    const texKey = realm.enemyTexMap?.[archetype] || 'enemy_swarm';
 
     const enemy = this.enemyPool.get(sx, sy, texKey);
     if (!enemy) return;
@@ -1021,8 +1046,8 @@ export class GameScene extends Phaser.Scene {
     enemy.setAlpha(1);
     enemy.setVisible(true);
 
-    const hpScale = 1 + waveIdx * 0.25;
-    const speedScale = 1 + Math.min(0.45, waveIdx * 0.04);
+    const hpScale = (1 + waveIdx * 0.25) * (realm.hpMult || 1.0);
+    const speedScale = (1 + Math.min(0.45, waveIdx * 0.04)) * (realm.speedMult || 1.0);
 
     if (archetype === 'tank') {
       enemy.baseScale = this.hdMode ? 0.363 : 1.34;
@@ -1125,11 +1150,13 @@ export class GameScene extends Phaser.Scene {
       if (drop) this._recycleEnemy(drop);
     }
 
-    const elite = this.enemyPool.get(bx, by, 'enemy_elite');
+    const realm = this.activeRealm || getRealmConfig('midgard');
+    const eliteKey = realm.enemyTexMap?.elite || 'enemy_elite';
+    const elite = this.enemyPool.get(bx, by, eliteKey);
     if (!elite) return;
 
-    elite.setTexture('enemy_elite');
-    elite.baseTexKey = 'enemy_elite';
+    elite.setTexture(eliteKey);
+    elite.baseTexKey = eliteKey;
     elite.enableBody(true, bx, by, true, true);
     elite.baseScale = this.hdMode ? 0.385 : 1.44;
     elite.setScale(elite.baseScale);
@@ -1139,9 +1166,9 @@ export class GameScene extends Phaser.Scene {
     elite.isBoss = false;
     elite.isMiniBoss = true;
     elite.archetype = 'elite';
-    elite.maxHp = 420 + idx * 240;
+    elite.maxHp = Math.round((420 + idx * 240) * (realm.hpMult || 1.0));
     elite.hp = elite.maxHp;
-    elite.speed = 66 + idx * 4;
+    elite.speed = Math.round((66 + idx * 4) * (realm.speedMult || 1.0));
     elite.damage = 20;
     elite.xpValue = 25;
     elite.knockbackTimer = 0;
@@ -1165,9 +1192,12 @@ export class GameScene extends Phaser.Scene {
     this.activeMiniBoss = elite;
     this.activeEnemies.push(elite);
     audio.playBossAlarm();
-    const titles = ['Campione Jotun', 'Valkiria Caduta', 'Signore delle Ceneri'];
+    const titles = realm.miniBossTitles || ['Campione Jotun', 'Valkiria Caduta', 'Signore delle Ceneri'];
     elite.displayName = `${titles[idx % titles.length]} (Elite)`;
     this.bridge?.onBossHudUpdate?.({ name: elite.displayName, hp: elite.hp, maxHp: elite.maxHp });
+    if (idx === 0) {
+      this._emitDialogue('miniboss_0');
+    }
   }
 
   async _triggerBossSequence() {
@@ -1176,17 +1206,19 @@ export class GameScene extends Phaser.Scene {
     this.physics.pause();
     this._resetJoystick();
 
+    const realm = this.activeRealm || getRealmConfig('midgard');
     audio.playBossAlarm();
-    this.bridge?.onBossWarning?.(true);
+    this.bridge?.onBossWarning?.(true, realm.boss.warningText);
 
     await new Promise((r) => setTimeout(r, 1200));
     this.bridge?.onBossWarning?.(false);
 
     if (this.storyManager) {
-      await this.storyManager.play('onBossSpawn', this.activeHeroId);
+      await this.storyManager.play('onBossSpawn', this.activeHeroId, this.activeRealmId);
     }
 
     this._spawnBoss();
+    this._emitDialogue('boss_enter');
     this.gameState = 'PLAYING';
     this.physics.resume();
     this.cameras.main.shake(300, 0.008);
@@ -1201,11 +1233,14 @@ export class GameScene extends Phaser.Scene {
       if (drop) this._recycleEnemy(drop);
     }
 
-    const boss = this.enemyPool.get(bx, by, 'boss');
+    const realm = this.activeRealm || getRealmConfig('midgard');
+    const bossCfg = realm.boss;
+    const bossTex = realm.enemyTexMap?.boss || 'boss';
+    const boss = this.enemyPool.get(bx, by, bossTex);
     if (!boss) return;
 
-    boss.setTexture('boss');
-    boss.baseTexKey = 'boss';
+    boss.setTexture(bossTex);
+    boss.baseTexKey = bossTex;
     boss.enableBody(true, bx, by, true, true);
     boss.baseScale = this.hdMode ? 0.413 : 1.60;
     boss.setScale(boss.baseScale);
@@ -1215,10 +1250,12 @@ export class GameScene extends Phaser.Scene {
     boss.isBoss = true;
     boss.isMiniBoss = false;
     boss.archetype = 'boss';
-    boss.maxHp = 4500;
+    boss.maxHp = bossCfg.maxHp;
     boss.hp = boss.maxHp;
-    boss.speed = 64;
-    boss.damage = 28;
+    boss.speed = bossCfg.speed;
+    boss.damage = bossCfg.damage;
+    boss.displayName = bossCfg.name;
+    boss.attackProfile = bossCfg.attackProfile;
     boss.xpValue = 60;
     boss.knockbackTimer = 0;
     boss.flashTimer = 0;
@@ -1243,8 +1280,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.bossSprite = boss;
+    this.bossHalfHpTriggered = false;
+    this.bossAttackStep = 0;
     this.activeEnemies.push(boss);
-    this.bridge?.onBossHudUpdate?.({ name: 'Hrimthurs, Signore del Gelo', hp: boss.hp, maxHp: boss.maxHp });
+    this.bridge?.onBossHudUpdate?.({ name: bossCfg.name, hp: boss.hp, maxHp: boss.maxHp });
   }
 
   /**
@@ -1795,11 +1834,17 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (enemy.isBoss) {
+      const bossName = this.activeRealm?.boss?.name || 'Hrimthurs, Signore del Gelo';
       this.bridge?.onBossHudUpdate?.({
-        name: 'Hrimthurs, Signore del Gelo',
+        name: bossName,
         hp: Math.max(0, enemy.hp),
         maxHp: enemy.maxHp
       });
+      if (!this.bossHalfHpTriggered && enemy.hp > 0 && enemy.hp <= enemy.maxHp * 0.5) {
+        this.bossHalfHpTriggered = true;
+        this._emitDialogue('boss_half');
+        this._emitSparks(enemy.x, enemy.y, 18, this.activeRealm?.boss?.telegraphColor || 0xf87171, 180);
+      }
     } else if (enemy.isMiniBoss && !this.bossSpawned) {
       this.bridge?.onBossHudUpdate?.({
         name: enemy.displayName || 'Campione Elite',
@@ -1858,12 +1903,14 @@ export class GameScene extends Phaser.Scene {
     audio.playVictory();
 
     if (this.storyManager) {
-      await this.storyManager.play('onVictory', this.activeHeroId);
+      await this.storyManager.play('onVictory', this.activeHeroId, this.activeRealmId);
     }
 
     this.gameState = 'ENDED';
     this.bridge?.onRunEnded?.({
       victory: true,
+      realmId: this.activeRealmId,
+      xpBonusMult: this.activeRealm?.xpBonusMult || 1.0,
       heroId: this.activeHeroId,
       startingWeaponId: this.activeWeaponId,
       elapsedSec: Math.floor(this.elapsedSec),
@@ -1905,12 +1952,14 @@ export class GameScene extends Phaser.Scene {
     audio.playGameOver();
 
     if (this.storyManager) {
-      await this.storyManager.play('onGameOver', this.activeHeroId);
+      await this.storyManager.play('onGameOver', this.activeHeroId, this.activeRealmId);
     }
 
     this.gameState = 'ENDED';
     this.bridge?.onRunEnded?.({
       victory: false,
+      realmId: this.activeRealmId,
+      xpBonusMult: this.activeRealm?.xpBonusMult || 1.0,
       heroId: this.activeHeroId,
       startingWeaponId: this.activeWeaponId,
       elapsedSec: Math.floor(this.elapsedSec),
@@ -2028,19 +2077,84 @@ export class GameScene extends Phaser.Scene {
     if (this.bossSprite && this.bossSprite.active) {
       this.timers.bossAttack -= dt;
       if (this.timers.bossAttack <= 0) {
-        this.timers.bossAttack = 3.1;
-        const count = 2 + (this.bossSprite.hp < this.bossSprite.maxHp * 0.5 ? 1 : 0);
-        for (let c = 0; c < count; c++) {
-          const offsetAng = Math.random() * Math.PI * 2;
-          const offsetR = c === 0 ? 18 : 65 + Math.random() * 85;
-          this.activeTelegraphs.push({
-            x: hx + Math.cos(offsetAng) * offsetR,
-            y: hy + Math.sin(offsetAng) * offsetR,
-            radius: 66,
-            elapsed: 0,
-            duration: 1.25
-          });
+        const enraged = this.bossSprite.hp < this.bossSprite.maxHp * 0.5;
+        const profile = this.bossSprite.attackProfile || 'frost';
+        this.bossAttackStep = (this.bossAttackStep || 0) + 1;
+        this.timers.bossAttack = enraged ? 2.45 : 3.1;
+
+        if (profile === 'fire') {
+          // Surtr: Schianto lavico + Pioggia di Meteore + Raffica braci in fase 2
+          const meteorCount = (this.bossAttackStep % 2 === 0 ? 4 : 3) + (enraged ? 2 : 0);
+          for (let c = 0; c < meteorCount; c++) {
+            const offsetAng = (c / meteorCount) * Math.PI * 2 + Math.random() * 0.5;
+            const offsetR = c === 0 ? 16 : 56 + Math.random() * 95;
+            this.activeTelegraphs.push({
+              x: hx + Math.cos(offsetAng) * offsetR,
+              y: hy + Math.sin(offsetAng) * offsetR,
+              radius: 62,
+              elapsed: -c * 0.14,
+              duration: 1.25,
+              color: 0xfb923c,
+              damage: 28
+            });
+          }
+          if (enraged || this.bossAttackStep % 2 === 1) {
+            this._fireBossRadialVolley(this.bossSprite, enraged ? 8 : 5, 'fire_bolt', 195);
+          }
+        } else if (profile === 'shadow') {
+          // Hel: Anelli necrotici + Spirale d'ombra rotante
+          const ringCount = 3 + (enraged ? 1 : 0);
+          for (let c = 0; c < ringCount; c++) {
+            const offsetAng = Math.random() * Math.PI * 2;
+            const offsetR = c === 0 ? 14 : 64 + Math.random() * 88;
+            this.activeTelegraphs.push({
+              x: hx + Math.cos(offsetAng) * offsetR,
+              y: hy + Math.sin(offsetAng) * offsetR,
+              radius: 64,
+              elapsed: 0,
+              duration: 1.15,
+              color: 0xa855f7,
+              damage: 30
+            });
+          }
+          this._fireBossRadialVolley(this.bossSprite, enraged ? 10 : 7, 'shadow_bolt', 180, this.bossAttackStep * 0.35);
+        } else {
+          const count = 2 + (enraged ? 1 : 0);
+          for (let c = 0; c < count; c++) {
+            const offsetAng = Math.random() * Math.PI * 2;
+            const offsetR = c === 0 ? 18 : 65 + Math.random() * 85;
+            this.activeTelegraphs.push({
+              x: hx + Math.cos(offsetAng) * offsetR,
+              y: hy + Math.sin(offsetAng) * offsetR,
+              radius: 66,
+              elapsed: 0,
+              duration: 1.25,
+              color: 0xf87171,
+              damage: 26
+            });
+          }
         }
+      }
+    }
+  }
+
+  _fireBossRadialVolley(boss, count, projKey, speed = 185, angleOffset = 0) {
+    if (!boss || !boss.active) return;
+    const tex = this.textures.exists(projKey) ? projKey : 'frost_arrow';
+    for (let i = 0; i < count; i++) {
+      const proj = this.enemyProjPool.get(boss.x, boss.y, tex);
+      if (!proj) break;
+      const ang = angleOffset + (i / count) * Math.PI * 2;
+      proj.setTexture(tex);
+      proj.enableBody(true, boss.x, boss.y, true, true);
+      proj.setScale(this.hdMode ? 0.44 : 1.2);
+      proj.setRotation(ang);
+      proj.setDepth(DEPTH_LAYERS.VFX - 5);
+      proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
+      proj.life = 3.2;
+      proj.damage = Math.round((boss.damage || 28) * 0.72);
+      if (!this.activeEnemyProjectiles.includes(proj)) {
+        this.activeEnemyProjectiles.push(proj);
       }
     }
   }
@@ -2052,15 +2166,17 @@ export class GameScene extends Phaser.Scene {
     for (let i = this.activeTelegraphs.length - 1; i >= 0; i--) {
       const t = this.activeTelegraphs[i];
       t.elapsed += dt;
+      if (t.elapsed < 0) continue;
       const progress = Math.min(1, t.elapsed / t.duration);
+      const col = t.color || 0xf87171;
 
-      this.telegraphGfx.lineStyle(2.5, 0xf87171, 0.92);
-      this.telegraphGfx.fillStyle(0xdc2626, 0.14);
+      this.telegraphGfx.lineStyle(2.5, col, 0.92);
+      this.telegraphGfx.fillStyle(col, 0.14);
       this.telegraphGfx.fillCircle(t.x, t.y, t.radius);
       this.telegraphGfx.strokeCircle(t.x, t.y, t.radius);
 
       // Anello interno che si riempie + anello convergente
-      this.telegraphGfx.fillStyle(0xef4444, 0.36);
+      this.telegraphGfx.fillStyle(col, 0.36);
       this.telegraphGfx.fillCircle(t.x, t.y, t.radius * progress);
       this.telegraphGfx.lineStyle(1.5, 0xfecaca, 0.75);
       this.telegraphGfx.strokeCircle(t.x, t.y, t.radius * (1 - progress * 0.85));
@@ -2073,12 +2189,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   _detonateTelegraph(t) {
+    const col = t.color || 0xf87171;
     audio.playBossAttack();
     this.cameras.main.shake(160, 0.0075);
-    this._emitSparks(t.x, t.y, 16, 0xf87171, 180);
+    this._emitSparks(t.x, t.y, 16, col, 180);
 
     const ring = this.add
-      .circle(t.x, t.y, t.radius, 0xf87171, 0.48)
+      .circle(t.x, t.y, t.radius, col, 0.48)
       .setDepth(DEPTH_LAYERS.VFX);
     this.tweens.add({
       targets: ring,
@@ -2092,7 +2209,7 @@ export class GameScene extends Phaser.Scene {
       computeSquaredDistance(this.hero.x, this.hero.y, t.x, t.y) <= t.radius * t.radius &&
       this.stats.invulnTimer <= 0
     ) {
-      this.stats.hp = Math.max(0, this.stats.hp - 26);
+      this.stats.hp = Math.max(0, this.stats.hp - (t.damage || 26));
       this.stats.invulnTimer = 0.55;
       audio.playPlayerHurt();
       if (this.stats.hp <= 0) {
@@ -2102,11 +2219,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   _fireEnemyFrostArrow(archer, targetX, targetY) {
-    const proj = this.enemyProjPool.get(archer.x, archer.y, 'frost_arrow');
+    const projKey = this.activeRealm?.rangedProjKey || 'frost_arrow';
+    const tex = this.textures.exists(projKey) ? projKey : 'frost_arrow';
+    const proj = this.enemyProjPool.get(archer.x, archer.y, tex);
     if (!proj) return;
     const ang = Math.atan2(targetY - archer.y, targetX - archer.x);
     const speed = 185;
-    proj.setTexture('frost_arrow');
+    proj.setTexture(tex);
     proj.enableBody(true, archer.x, archer.y, true, true);
     proj.setScale(this.hdMode ? 0.36 : 1.1);
     proj.setRotation(ang);
@@ -2334,15 +2453,30 @@ export class GameScene extends Phaser.Scene {
     const h = this.scale.height;
     this.weatherGfx.clear();
 
+    const mode = this.activeRealm?.weatherMode || 'snow';
     for (const m of this.weatherMotes) {
-      m.x += m.vx * dt;
-      m.y += (m.isEmber ? -m.vy * 0.85 : m.vy) * dt;
+      if (mode === 'embers') {
+        m.x += m.vx * 0.6 * dt;
+        m.y -= m.vy * 1.15 * dt;
+      } else if (mode === 'spectral') {
+        m.x += m.vx * 0.45 * dt;
+        m.y -= m.vy * 0.55 * dt;
+      } else {
+        m.x += m.vx * dt;
+        m.y += (m.isEmber ? -m.vy * 0.85 : m.vy) * dt;
+      }
       if (m.x < -8) m.x = w + 8;
       if (m.x > w + 8) m.x = -8;
       if (m.y > h + 8) m.y = -8;
       if (m.y < -8) m.y = h + 8;
 
-      this.weatherGfx.fillStyle(m.isEmber ? 0xfb923c : 0xe2e8f0, m.alpha);
+      const color =
+        mode === 'embers'
+          ? m.isEmber ? 0xfef08a : 0xf97316
+          : mode === 'spectral'
+            ? m.isEmber ? 0xc084fc : 0x34d399
+            : m.isEmber ? 0xfb923c : 0xe2e8f0;
+      this.weatherGfx.fillStyle(color, m.alpha);
       this.weatherGfx.fillCircle(m.x, m.y, m.size);
     }
   }
@@ -2833,6 +2967,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  _applyRealmToDecalsAndProps() {
+    const realm = this.activeRealm || getRealmConfig('midgard');
+    const decals = realm.decalKeys || ['decal_rune', 'decal_relic', 'decal_snow'];
+    for (let i = 0; i < (this.groundDecals?.length || 0); i++) {
+      const key = decals[i % decals.length];
+      if (this.textures.exists(key)) {
+        this.groundDecals[i].setTexture(key);
+      }
+    }
+
+    const props = realm.propKeys || ['prop_brazier', 'prop_rock', 'prop_tree', 'prop_tree', 'prop_tree'];
+    for (let i = 0; i < (this.propItems?.length || 0); i++) {
+      const prop = this.propItems[i];
+      const kind = props[i % props.length];
+      prop.kind = kind;
+      if (this.textures.exists(kind)) {
+        prop.setTexture(kind);
+      }
+      const isTree = kind === 'prop_tree' || kind === 'prop_dead_tree' || kind === 'prop_magma_spire';
+      const pScale = this.hdMode
+        ? isTree ? 0.43 : 0.39
+        : isTree ? 1.25 : 1.15;
+      prop.setScale(pScale);
+      if (prop.glow) {
+        const hasGlow = kind === 'prop_brazier' || kind === 'prop_soul_brazier' || kind === 'prop_magma_spire';
+        prop.glow.setVisible(hasGlow);
+        if (kind === 'prop_soul_brazier') prop.glow.setFillStyle(0x10b981, 0.16);
+        else prop.glow.setFillStyle(0xf97316, 0.16);
+      }
+    }
+  }
+
   /**
    * Ostacoli scenici riciclati (Pini nordici, Monoliti runici, Bracieri accesi)
    */
@@ -2846,8 +3012,9 @@ export class GameScene extends Phaser.Scene {
         : kind === 'prop_tree' ? 1.25 : 1.15;
       prop.setScale(pScale);
       prop.kind = kind;
-      if (kind === 'prop_brazier') {
+      if (mod === 0 || mod === 2) {
         prop.glow = this.add.circle(0, 0, 34, 0xf97316, 0.15).setDepth(DEPTH_LAYERS.DECALS + 1);
+        if (mod !== 0) prop.glow.setVisible(false);
       }
       this.propItems.push(prop);
     }
@@ -3551,6 +3718,45 @@ export class GameScene extends Phaser.Scene {
       g.fillRect(3, 3, 10, 10);
       g.generateTexture('magnet_pickup', 16, 16);
     }
+
+    // 15. Fallback procedurali per Muspelheim & Helheim in ambienti headless/test
+    const ensureSimple = (key, color, w = 36, h = 42) => {
+      if (this.textures.exists(key)) return;
+      g.clear();
+      g.fillStyle(color, 1);
+      g.fillRect(2, 2, w - 4, h - 4);
+      g.generateTexture(key, w, h);
+    };
+    ensureSimple('ground_tile_muspel', 0x1a0b08, 256, 256);
+    ensureSimple('decal_lava', 0xea580c, 52, 36);
+    ensureSimple('decal_ember_rune', 0xf97316, 52, 36);
+    ensureSimple('decal_ash', 0x44403c, 48, 24);
+    ensureSimple('prop_obsidian', 0x292524, 36, 48);
+    ensureSimple('prop_magma_spire', 0x57534e, 50, 68);
+    ensureSimple('enemy_muspel_swarm', 0x9a3412, 30, 34);
+    ensureSimple('enemy_muspel_fast', 0xea580c, 34, 26);
+    ensureSimple('enemy_muspel_archer', 0xc2410c, 30, 34);
+    ensureSimple('enemy_muspel_berserker', 0x7c2d12, 36, 40);
+    ensureSimple('enemy_muspel_tank', 0x44403c, 40, 46);
+    ensureSimple('enemy_muspel_elite', 0xf97316, 46, 52);
+    ensureSimple('boss_surtr', 0xea580c, 70, 80);
+    ensureSimple('fire_bolt', 0xfb923c, 16, 8);
+
+    ensureSimple('ground_tile_hel', 0x0a1017, 256, 256);
+    ensureSimple('decal_hel_rune', 0x10b981, 52, 36);
+    ensureSimple('decal_bones', 0x94a3b8, 34, 32);
+    ensureSimple('decal_mist', 0x065f46, 48, 24);
+    ensureSimple('prop_soul_brazier', 0x10b981, 32, 38);
+    ensureSimple('prop_hel_obelisk', 0x3b0764, 36, 48);
+    ensureSimple('prop_dead_tree', 0x334155, 50, 68);
+    ensureSimple('enemy_hel_swarm', 0x065f46, 30, 34);
+    ensureSimple('enemy_hel_fast', 0x10b981, 34, 26);
+    ensureSimple('enemy_hel_archer', 0x6b21a8, 30, 34);
+    ensureSimple('enemy_hel_berserker', 0x581c87, 36, 40);
+    ensureSimple('enemy_hel_tank', 0x1e293b, 40, 46);
+    ensureSimple('enemy_hel_elite', 0xa855f7, 46, 52);
+    ensureSimple('boss_hel', 0x7e22ce, 70, 80);
+    ensureSimple('shadow_bolt', 0xa855f7, 16, 8);
 
     g.destroy();
   }

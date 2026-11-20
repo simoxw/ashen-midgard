@@ -126,7 +126,14 @@ export class StoryManager {
     }
   }
 
-  getSlidesFor(triggerName, heroId = null) {
+  getSlidesFor(triggerName, heroId = null, realmId = 'midgard') {
+    const realmSlides =
+      realmId && realmId !== 'midgard'
+        ? this.storyData.realms?.[realmId]?.[triggerName]
+        : null;
+    if (Array.isArray(realmSlides) && realmSlides.length > 0) {
+      return realmSlides;
+    }
     const heroSlides = heroId ? this.storyData.heroes?.[heroId]?.[triggerName] : null;
     if (Array.isArray(heroSlides) && heroSlides.length > 0) {
       return heroSlides;
@@ -135,10 +142,10 @@ export class StoryManager {
   }
 
   /**
-   * Avvia la sequenza di vignette per un trigger specifico e un eroe, restituendo una Promise.
+   * Avvia la sequenza di vignette per un trigger specifico, eroe e regno, restituendo una Promise.
    */
-  play(triggerName, heroId = null) {
-    const slides = this.getSlidesFor(triggerName, heroId);
+  play(triggerName, heroId = null, realmId = 'midgard') {
+    const slides = this.getSlidesFor(triggerName, heroId, realmId);
     if (!slides || slides.length === 0 || !this.overlay) {
       return Promise.resolve();
     }
@@ -279,6 +286,7 @@ export class StoryManager {
       this.ctx.clearRect(0, 0, w, h);
 
       const isFrost = this.particleMode === 'frost';
+      const isSpectral = this.particleMode === 'spectral';
       for (const p of this.particles) {
         p.x += p.vx;
         p.y += isFrost ? Math.abs(p.vy) : -Math.abs(p.vy);
@@ -297,7 +305,9 @@ export class StoryManager {
         this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         this.ctx.fillStyle = isFrost
           ? `rgba(186, 230, 253, ${p.alpha.toFixed(2)})`
-          : `rgba(251, 146, 60, ${p.alpha.toFixed(2)})`;
+          : isSpectral
+            ? `rgba(52, 211, 153, ${p.alpha.toFixed(2)})`
+            : `rgba(251, 146, 60, ${p.alpha.toFixed(2)})`;
         this.ctx.fill();
       }
       this.particleRaf = requestAnimationFrame(tick);

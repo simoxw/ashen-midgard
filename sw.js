@@ -11,7 +11,7 @@
  *   - Immagini/Media/Font: aggiornamento in background nella stessa CACHE_NAME versionata.
  */
 
-const CACHE_VERSION = 'v4-4';
+const CACHE_VERSION = 'v4-5';
 const CACHE_NAME = `ashen-midgard-${CACHE_VERSION}`;
 
 const IS_AISTUDIO_PREVIEW =
@@ -43,8 +43,15 @@ const PRECACHE_ASSETS = [
   './assets/story/bjorn_intro.jpg',
   './assets/story/bjorn_victory.jpg',
   './assets/story/bjorn_gameover.jpg',
+  './assets/story/muspelheim_intro.jpg',
+  './assets/story/boss_surtr.jpg',
+  './assets/story/muspelheim_victory.jpg',
+  './assets/story/helheim_intro.jpg',
+  './assets/story/boss_hel.jpg',
+  './assets/story/helheim_victory.jpg',
   './assets/sprites/manifest.json',
   './src/main.js',
+  './src/realms.js',
   './src/heroes.js',
   './src/codex.js',
   './src/hdSprites.js',

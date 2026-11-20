@@ -185,6 +185,72 @@ export const CODEX_ENTRIES = [
     unlockHint: 'Sconfiggi Hrimthurs, Signore del Gelo almeno 1 volta',
     body: 'Quando la corona glaciale va in frantumi, l’aurora si apre sul Valhalla e i nomi dei sopravvissuti vengono incisi nella pietra eterna.',
     checkUnlock: (stats) => stats.bossesSlain >= 1
+  },
+  {
+    id: 'enemy_muspel_legion',
+    category: 'enemies',
+    title: 'Legioni di Muspelheim',
+    subtitle: 'Demoni delle Braci, Segugi & Colossi',
+    accent: '#f97316',
+    defaultUnlocked: false,
+    unlockHint: 'Combatti nelle Fucine di Muspelheim',
+    body: 'Creature forgiate nella lava viva: segugi incandescenti, piro-manti e colossi d’ossidiana che difendono il regno del fuoco.',
+    checkUnlock: (stats) => Boolean(stats.visitedRealms?.muspelheim)
+  },
+  {
+    id: 'enemy_muspel_boss',
+    category: 'enemies',
+    title: 'Surtr, Signore delle Braci',
+    subtitle: 'Titano del Fuoco Primordiale',
+    accent: '#fb923c',
+    defaultUnlocked: false,
+    unlockHint: 'Sconfiggi Surtr nelle Fucine di Muspelheim',
+    body: 'Il sovrano fiammeggiante destinato a bruciare il mondo. Evoca piogge di meteore e colpi d’area devastanti con la sua spada del crepuscolo.',
+    checkUnlock: (stats) => Boolean(stats.clearedRealms?.muspelheim)
+  },
+  {
+    id: 'enemy_hel_legion',
+    category: 'enemies',
+    title: 'Spettri di Nastrond & Evocatrici',
+    subtitle: 'Schiere dell’Abisso',
+    accent: '#10b981',
+    defaultUnlocked: false,
+    unlockHint: 'Scendi negli Abissi di Helheim',
+    body: 'Anime avvolte da nebbia smeraldo e guardiani d’ossa antiche guidati dalle evocatrici runiche della regina dei morti.',
+    checkUnlock: (stats) => Boolean(stats.visitedRealms?.helheim)
+  },
+  {
+    id: 'enemy_hel_boss',
+    category: 'enemies',
+    title: 'Hel, Regina degli Abissi',
+    subtitle: 'Sovrana di Helheim',
+    accent: '#a855f7',
+    defaultUnlocked: false,
+    unlockHint: 'Sconfiggi Hel negli Abissi di Helheim',
+    body: 'Custode delle anime perdute. Intesse spirali di dardi necrotici e anelli runici dell’oblio fino all’ultimo respiro.',
+    checkUnlock: (stats) => Boolean(stats.clearedRealms?.helheim)
+  },
+  {
+    id: 'lore_muspelheim',
+    category: 'lore',
+    title: 'Le Fucine del Crepuscolo',
+    subtitle: 'Cronache di Muspelheim',
+    accent: '#f97316',
+    defaultUnlocked: false,
+    unlockHint: 'Sconfiggi Hrimthurs o accedi a Muspelheim',
+    body: 'Oltre i ghiacci spezzati di Midgard arde la fornace eterna dove le scintille antiche diedero forma alle stelle e alla spada di Surtr.',
+    checkUnlock: (stats) => stats.bossesSlain >= 1 || Boolean(stats.visitedRealms?.muspelheim)
+  },
+  {
+    id: 'lore_helheim',
+    category: 'lore',
+    title: 'Il Trono delle Ombre',
+    subtitle: 'Cronache di Helheim',
+    accent: '#10b981',
+    defaultUnlocked: false,
+    unlockHint: 'Sconfiggi Surtr o accedi ad Helheim',
+    body: 'Sotto le radici più profonde di Yggdrasil scorrono i fiumi silenziosi di Helheim, dove solo chi ha domato gelo e fiamma può sopravvivere.',
+    checkUnlock: (stats) => Boolean(stats.clearedRealms?.muspelheim) || Boolean(stats.visitedRealms?.helheim)
   }
 ];
 
@@ -200,7 +266,9 @@ export function createDefaultCodexState() {
       bossesSlain: 0,
       bestElapsedSec: 0,
       playedHeroes: {},
-      wonHeroes: {}
+      wonHeroes: {},
+      visitedRealms: {},
+      clearedRealms: {}
     }
   };
 }
@@ -218,7 +286,9 @@ export function loadCodexState() {
         ...base.stats,
         ...(parsed?.stats || {}),
         playedHeroes: { ...(parsed?.stats?.playedHeroes || {}) },
-        wonHeroes: { ...(parsed?.stats?.wonHeroes || {}) }
+        wonHeroes: { ...(parsed?.stats?.wonHeroes || {}) },
+        visitedRealms: { ...(parsed?.stats?.visitedRealms || {}) },
+        clearedRealms: { ...(parsed?.stats?.clearedRealms || {}) }
       }
     };
   } catch {
@@ -269,6 +339,12 @@ export function recordRunCodexProgress(runResult = {}) {
     stats.playedHeroes[runResult.heroId] = true;
     if (runResult.victory) {
       stats.wonHeroes[runResult.heroId] = true;
+    }
+  }
+  if (runResult.realmId) {
+    stats.visitedRealms[runResult.realmId] = true;
+    if (runResult.victory) {
+      stats.clearedRealms[runResult.realmId] = true;
     }
   }
 

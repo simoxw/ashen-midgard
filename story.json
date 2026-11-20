@@ -264,5 +264,125 @@
         }
       ]
     }
+  },
+  "realms": {
+    "muspelheim": {
+      "onGameStart": [
+        {
+          "speaker": "Araldo di Cenere",
+          "text": "Oltre la tundra infranta si estendono le Fucine di Muspelheim. Qui la roccia stessa sanguina magma e le braci sussurrano il nome del crepuscolo.",
+          "image": "./assets/story/muspelheim_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Cronache delle Fucine",
+          "text": "Resisti per quattro minuti alle legioni infuocate finché Surtr, Signore delle Braci, non scenderà con la sua spada rovente.",
+          "image": "./assets/story/muspelheim_intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onBossSpawn": [
+        {
+          "speaker": "Surtr, Signore delle Braci",
+          "text": "Mortale! Hai osato varcare le mie fornaci. La tua armatura fonderà sotto il peso della lama del Ragnarok!",
+          "image": "./assets/story/boss_surtr.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Voce delle Rune",
+          "text": "Attenzione alle piogge di meteore! Muoviti fuori dai cerchi incandescenti quando Surtr leva la spada.",
+          "image": "./assets/story/boss_surtr.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Cronache del Valhalla",
+          "text": "La corona d'ossidiana si spezza nella cenere spenta. Persino il fuoco primordiale di Surtr si inchina alle tue rune!",
+          "image": "./assets/story/muspelheim_victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Voce delle Norne",
+          "text": "Solo un ultimo cancello resta sbarrato sotto le radici del mondo: gli Abissi di Helheim attendono il tuo passo.",
+          "image": "./assets/story/muspelheim_victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco delle Braci",
+          "text": "La vampa ti travolge tra i pilastri di basalto. Ma dalle tue ceneri può ancora sorgere una fiamma più forte.",
+          "image": "./assets/story/muspelheim_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        }
+      ]
+    },
+    "helheim": {
+      "onGameStart": [
+        {
+          "speaker": "Sussurro dell'Abisso",
+          "text": "Sotto le radici più profonde di Yggdrasil regna il silenzio di Helheim. Nebbia smeraldo e pietre antiche avvolgono i ponti dei perduti.",
+          "image": "./assets/story/helheim_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "spectral"
+        },
+        {
+          "speaker": "Cronache delle Ombre",
+          "text": "Sopravvivi quattro minuti tra spettri e guardiani d'ossa finché la Regina degli Abissi non reclamerà il suo trono.",
+          "image": "./assets/story/helheim_intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "spectral"
+        }
+      ],
+      "onBossSpawn": [
+        {
+          "speaker": "Hel, Regina degli Abissi",
+          "text": "Hai spezzato il gelo di Hrimthurs e spento le braci di Surtr... ma ogni cammino finisce davanti al mio trono.",
+          "image": "./assets/story/boss_hel.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "spectral"
+        },
+        {
+          "speaker": "Voce delle Rune",
+          "text": "Schiva le spirali necrotiche e gli anelli dell'oblio: la regina colpisce senza sosta!",
+          "image": "./assets/story/boss_hel.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "spectral"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Cronache del Valhalla",
+          "text": "Le catene spettrali di Helheim vanno in frantumi sotto una pioggia di scintille dorate. L'aurora illumina finalmente i Nove Regni!",
+          "image": "./assets/story/helheim_victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Canto degli Einherjar",
+          "text": "Hai dominato Midgard, Muspelheim e Helheim. La tua leggenda è scolpita per l'eternità.",
+          "image": "./assets/story/helheim_victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco dell'Abisso",
+          "text": "La nebbia di Nastrond avvolge il tuo scudo, ma il tuo spirito appartiene al Valhalla. Torna a sfidare la Regina!",
+          "image": "./assets/story/helheim_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "spectral"
+        }
+      ]
+    }
   }
 }

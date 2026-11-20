@@ -200,7 +200,8 @@ export function computeRunMetaXp(runResult) {
   const timeXp = Math.round((runResult.elapsedSec || 0) * 1.4);
   const killXp = Math.round((runResult.kills || 0) * 0.35);
   const bossBonus = runResult.bossDefeated ? 220 : 0;
-  return Math.max(15, timeXp + killXp + bossBonus);
+  const realmMult = runResult.xpBonusMult || 1.0;
+  return Math.max(15, Math.round((timeXp + killXp + bossBonus) * realmMult));
 }
 
 export function grantHeroMetaXp(heroId, runResult) {

@@ -255,6 +255,59 @@
         backdrop-filter: blur(4px);
       }
 
+      /* Dialogo breve in partita (non bloccante) */
+      #inrun-dialogue {
+        position: absolute;
+        bottom: 16px;
+        left: 12px;
+        right: 12px;
+        z-index: 25;
+        pointer-events: none;
+        background: rgba(9, 13, 22, 0.9);
+        border: 1px solid rgba(248, 250, 252, 0.16);
+        border-radius: 10px;
+        padding: 9px 12px;
+        backdrop-filter: blur(6px);
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+        opacity: 0;
+        transform: translateY(8px);
+        transition: opacity 200ms ease, transform 200ms ease;
+      }
+
+      #inrun-dialogue.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .inrun-dialogue-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        margin-bottom: 3px;
+      }
+
+      #inrun-dialogue-speaker {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 12px;
+        color: var(--gold);
+      }
+
+      #inrun-dialogue-role {
+        font-family: 'Silkscreen', monospace;
+        font-size: 9px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      #inrun-dialogue-text {
+        margin: 0;
+        font-size: 12px;
+        line-height: 1.38;
+        color: #e2e8f0;
+      }
+
       /* Barra Vita Boss Finale */
       #boss-hud {
         position: absolute;
@@ -414,6 +467,65 @@
         letter-spacing: 0.04em;
         color: var(--muted);
         text-transform: uppercase;
+      }
+
+      /* Selettore Regni Campagna */
+      #realm-selector-list {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+
+      .realm-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 3px;
+        min-height: 64px;
+        padding: 8px 8px 7px;
+        background: rgba(30, 41, 59, 0.56);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+      }
+
+      .realm-card:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+
+      .realm-card.is-selected {
+        background: rgba(30, 41, 59, 0.94);
+        border-color: var(--realm-accent, var(--frost));
+        box-shadow: 0 0 0 1px var(--realm-accent, var(--frost)) inset, 0 6px 16px rgba(0, 0, 0, 0.35);
+      }
+
+      .realm-card.is-locked {
+        opacity: 0.5;
+        cursor: not-allowed;
+        background: rgba(15, 23, 42, 0.65);
+      }
+
+      .realm-card-order {
+        font-family: 'Silkscreen', monospace;
+        font-size: 9px;
+        color: var(--realm-accent, var(--frost));
+      }
+
+      .realm-card-name {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 12px;
+        line-height: 1.15;
+      }
+
+      .realm-card-meta {
+        font-size: 10px;
+        line-height: 1.2;
+        color: var(--muted);
       }
 
       #hero-selector-grid {
@@ -684,6 +796,15 @@
         font-size: 12px;
         line-height: 1.4;
         color: #fde68a;
+        border-top: 1px solid rgba(226, 232, 240, 0.08);
+        padding-top: 6px;
+      }
+
+      #end-realm-unlock {
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1.4;
+        color: #fed7aa;
         border-top: 1px solid rgba(226, 232, 240, 0.08);
         padding-top: 6px;
       }
@@ -1212,6 +1333,14 @@
             </div>
             <div class="boss-bar-track"><div id="boss-hp-fill"></div></div>
           </div>
+
+          <div id="inrun-dialogue" class="hidden" aria-live="polite">
+            <div class="inrun-dialogue-head">
+              <span id="inrun-dialogue-speaker">Astrid</span>
+              <span id="inrun-dialogue-role">Valchiria</span>
+            </div>
+            <p id="inrun-dialogue-text"></p>
+          </div>
         </div>
 
         <!-- Allarme Boss -->
@@ -1232,6 +1361,11 @@
                 Sopravvivi all’orda nordica in verticale. Guadagna EXP permanente a fine partita per salire di grado.
               </p>
             </div>
+          </div>
+
+          <div>
+            <p class="section-kicker">Scegli Regno</p>
+            <div id="realm-selector-list"></div>
           </div>
 
           <div>
@@ -1364,7 +1498,9 @@
               <div id="end-meta-levelup" class="hidden">NUOVO GRADO RAGGIUNTO!</div>
               <div id="end-meta-unlocks" class="hidden"></div>
               <div id="end-codex-unlocks" class="hidden"></div>
+              <div id="end-realm-unlock" class="hidden"></div>
             </div>
+            <button type="button" id="next-realm-btn" class="btn-primary hidden">PROSEGUI</button>
             <button type="button" id="play-again-btn" class="btn-primary">GIOCA ANCORA</button>
             <button type="button" id="end-title-btn" class="btn-secondary">Menu Principale</button>
           </div>

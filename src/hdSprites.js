@@ -2032,4 +2032,987 @@ export function generateHdTextures(textures) {
   drawHdGem('gem_blue', '#0284c7', '#bae6fd', 'rgba(56, 189, 248, 0.55)');
   drawHdGem('gem_green', '#059669', '#a7f3d0', 'rgba(52, 211, 153, 0.55)');
   drawHdGem('gem_gold', '#d97706', '#fef3c7', 'rgba(251, 191, 36, 0.6)');
+
+  // ===========================================================================
+  // 12. BIOMA MUSPELHEIM (Terreno lavico, decali, prop, nemici 4x, Surtr)
+  // ===========================================================================
+  registerCanvas(textures, 'ground_tile_muspel', 512, 512, (ctx, w, h) => {
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#160907');
+    bg.addColorStop(0.5, '#1e0c09');
+    bg.addColorStop(1, '#120705');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    // Alone di calore vulcanico
+    const heatPatches = [
+      [96, 84, 128, 0.14],
+      [352, 112, 140, 0.12],
+      [152, 336, 146, 0.13],
+      [410, 390, 120, 0.14]
+    ];
+    for (const [fx, fy, fr, fa] of heatPatches) {
+      const rg = ctx.createRadialGradient(fx, fy, 6, fx, fy, fr);
+      rg.addColorStop(0, `rgba(249, 115, 22, ${fa})`);
+      rg.addColorStop(0.55, `rgba(154, 52, 18, ${fa * 0.6})`);
+      rg.addColorStop(1, 'rgba(26, 11, 8, 0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Lastroni d'ossidiana scura
+    const slabs = [
+      [36, 46, 98, 62, -0.05],
+      [272, 134, 108, 66, 0.04],
+      [104, 344, 102, 62, 0.03],
+      [362, 356, 94, 58, -0.04]
+    ];
+    for (const [sx, sy, sw, sh, rot] of slabs) {
+      ctx.save();
+      ctx.translate(sx + sw / 2, sy + sh / 2);
+      ctx.rotate(rot);
+      drawRoundedPath(ctx, -sw / 2, -sh / 2, sw, sh, 10);
+      const sg = ctx.createLinearGradient(0, -sh / 2, 0, sh / 2);
+      sg.addColorStop(0, '#331c18');
+      sg.addColorStop(1, '#1b0d0a');
+      ctx.fillStyle = sg;
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = 'rgba(251, 146, 60, 0.18)';
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Crepe incandescenti di magma nel basalto
+    ctx.strokeStyle = 'rgba(249, 115, 22, 0.34)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(48, 220);
+    ctx.lineTo(94, 242);
+    ctx.lineTo(132, 228);
+    ctx.moveTo(310, 48);
+    ctx.lineTo(342, 82);
+    ctx.lineTo(330, 120);
+    ctx.moveTo(220, 412);
+    ctx.lineTo(266, 434);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_lava', 132, 88, (ctx) => {
+    const g = ctx.createRadialGradient(66, 44, 8, 66, 44, 58);
+    g.addColorStop(0, 'rgba(251, 191, 36, 0.65)');
+    g.addColorStop(0.45, 'rgba(234, 88, 12, 0.48)');
+    g.addColorStop(1, 'rgba(26, 11, 8, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(66, 44, 58, 30, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  registerCanvas(textures, 'decal_ember_rune', 124, 92, (ctx) => {
+    ctx.fillStyle = 'rgba(28, 13, 10, 0.72)';
+    drawRoundedPath(ctx, 10, 12, 104, 68, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(249, 115, 22, 0.55)';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(62, 46, 18, 0, Math.PI * 2);
+    ctx.moveTo(62, 28);
+    ctx.lineTo(74, 54);
+    ctx.lineTo(50, 54);
+    ctx.closePath();
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_ash', 128, 68, (ctx) => {
+    const g = ctx.createRadialGradient(64, 34, 6, 64, 34, 58);
+    g.addColorStop(0, 'rgba(87, 83, 78, 0.5)');
+    g.addColorStop(1, 'rgba(28, 25, 23, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(64, 34, 58, 24, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  registerCanvas(textures, 'prop_obsidian', 112, 148, (ctx) => {
+    const stone = ctx.createLinearGradient(20, 12, 92, 136);
+    stone.addColorStop(0, '#44403c');
+    stone.addColorStop(0.55, '#1c1917');
+    stone.addColorStop(1, '#090d16');
+    ctx.fillStyle = stone;
+    ctx.beginPath();
+    ctx.moveTo(56, 8);
+    ctx.lineTo(94, 46);
+    ctx.lineTo(86, 134);
+    ctx.lineTo(22, 134);
+    ctx.lineTo(18, 48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(56, 40);
+    ctx.lineTo(48, 80);
+    ctx.lineTo(66, 108);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'prop_magma_spire', 132, 184, (ctx) => {
+    const spire = ctx.createLinearGradient(34, 16, 98, 170);
+    spire.addColorStop(0, '#57534e');
+    spire.addColorStop(0.5, '#292524');
+    spire.addColorStop(1, '#0c0a09');
+    ctx.fillStyle = spire;
+    ctx.beginPath();
+    ctx.moveTo(66, 10);
+    ctx.lineTo(106, 94);
+    ctx.lineTo(96, 168);
+    ctx.lineTo(34, 168);
+    ctx.lineTo(26, 94);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const glow = ctx.createRadialGradient(66, 96, 4, 66, 96, 44);
+    glow.addColorStop(0, 'rgba(251, 146, 60, 0.78)');
+    glow.addColorStop(1, 'rgba(234, 88, 12, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(66, 96, 44, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Nemici Muspelheim 4x multi-frame
+  registerAnimated('enemy_muspel_swarm', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 36 - stride * 0.4, 94 - stride * 0.7, 16, 34, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 68 + stride * 0.4, 94 + stride * 0.7, 16, 34, 5);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob);
+    const body = ctx.createLinearGradient(32, 46, 88, 98);
+    body.addColorStop(0, '#9a3412');
+    body.addColorStop(0.55, '#431407');
+    body.addColorStop(1, '#090d16');
+    ctx.fillStyle = body;
+    drawRoundedPath(ctx, 32, 48, 56, 50, 11);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#292524';
+    ctx.beginPath();
+    ctx.ellipse(60, 32, 17, 17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+
+    for (const [hx, dir] of [[44, -1], [76, 1]]) {
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.moveTo(hx, 24);
+      ctx.quadraticCurveTo(hx + dir * 18, 12, hx + dir * 14, 3);
+      ctx.lineTo(hx - dir * 2, 18);
+      ctx.closePath();
+      ctx.fill();
+    }
+    drawGlowEye(ctx, 53, 33, 2.8, '#fef08a', 'rgba(249, 115, 22, 0.98)');
+    drawGlowEye(ctx, 67, 33, 2.8, '#fef08a', 'rgba(249, 115, 22, 0.98)');
+
+    ctx.save();
+    ctx.translate(93, 62);
+    ctx.rotate(sway * 1.4);
+    ctx.translate(-93, -62);
+    ctx.fillStyle = '#fb923c';
+    drawRoundedPath(ctx, 89, 34, 10, 44, 4);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_muspel_fast', 144, 112, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    for (const [lx, ly] of [[32 - stride * 0.8, 72], [53 + stride * 0.5, 74], [86 + stride * 0.9, 72]]) {
+      ctx.fillStyle = '#431407';
+      drawRoundedPath(ctx, lx, ly, 14, 31, 5);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(0, bob * 0.8);
+    const fur = ctx.createLinearGradient(26, 34, 112, 80);
+    fur.addColorStop(0, '#ea580c');
+    fur.addColorStop(0.55, '#7c2d12');
+    fur.addColorStop(1, '#1c1917');
+    ctx.fillStyle = fur;
+    ctx.beginPath();
+    ctx.ellipse(67, 58, 39, 20, -0.06 + sway * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    ctx.fillStyle = '#9a3412';
+    ctx.beginPath();
+    ctx.moveTo(85, 34);
+    ctx.lineTo(100, 12);
+    ctx.lineTo(134, 40);
+    ctx.lineTo(126, 56);
+    ctx.lineTo(92, 58);
+    ctx.closePath();
+    ctx.fill();
+    drawGlowEye(ctx, 110, 37, 3.2, '#fef08a', 'rgba(249, 115, 22, 0.98)');
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_muspel_archer', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 38 - stride * 0.4, 94 - stride * 0.65, 14, 34, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 68 + stride * 0.4, 94 + stride * 0.65, 14, 34, 5);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    const cloak = ctx.createLinearGradient(34, 42, 86, 114);
+    cloak.addColorStop(0, '#c2410c');
+    cloak.addColorStop(1, '#431407');
+    ctx.fillStyle = cloak;
+    ctx.beginPath();
+    ctx.moveTo(38, 44);
+    ctx.lineTo(24, 112);
+    ctx.quadraticCurveTo(60, 120, 96, 112);
+    ctx.lineTo(82, 44);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#7c2d12';
+    ctx.beginPath();
+    ctx.moveTo(38, 42);
+    ctx.quadraticCurveTo(60, 4, 82, 42);
+    ctx.closePath();
+    ctx.fill();
+    drawGlowEye(ctx, 53, 31, 2.7, '#fffbeb', 'rgba(251, 146, 60, 0.98)');
+    drawGlowEye(ctx, 67, 31, 2.7, '#fffbeb', 'rgba(251, 146, 60, 0.98)');
+
+    ctx.save();
+    ctx.translate(92, 66);
+    ctx.rotate(sway * 0.8);
+    ctx.translate(-92, -66);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(92, 28);
+    ctx.lineTo(92, 108);
+    ctx.stroke();
+    drawGlowEye(ctx, 92, 26, 5, '#fffbeb', 'rgba(249, 115, 22, 0.95)');
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_muspel_berserker', 144, 160, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 40 - stride * 0.5, 110 - stride * 0.85, 21, 40, 6);
+    ctx.fill();
+    drawRoundedPath(ctx, 82 + stride * 0.5, 110 + stride * 0.85, 21, 40, 6);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#7c2d12';
+    drawRoundedPath(ctx, 36, 54, 72, 64, 15);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = '#292524';
+    drawRoundedPath(ctx, 50, 20, 44, 38, 12);
+    ctx.fill();
+    drawGlowEye(ctx, 63, 39, 3.2, '#fef08a', 'rgba(249, 115, 22, 1)');
+    drawGlowEye(ctx, 81, 39, 3.2, '#fef08a', 'rgba(249, 115, 22, 1)');
+    for (const [ax, dir] of [[24, -1], [120, 1]]) {
+      ctx.save();
+      ctx.translate(ax, 84);
+      ctx.rotate(dir * sway * 1.5);
+      ctx.translate(-ax, -84);
+      ctx.fillStyle = '#fb923c';
+      drawRoundedPath(ctx, ax - 5, 52, 14, 38, 4);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_muspel_tank', 168, 192, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 42, 138 - stride * 0.65, 30, 44, 8);
+    ctx.fill();
+    drawRoundedPath(ctx, 96, 138 + stride * 0.65, 30, 44, 8);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob * 0.9);
+    const armor = ctx.createLinearGradient(30, 50, 138, 150);
+    armor.addColorStop(0, '#57534e');
+    armor.addColorStop(0.5, '#292524');
+    armor.addColorStop(1, '#0c0a09');
+    ctx.fillStyle = armor;
+    drawRoundedPath(ctx, 33, 56, 102, 90, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#f97316';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#292524';
+    drawRoundedPath(ctx, 54, 18, 60, 44, 13);
+    ctx.fill();
+    drawGlowEye(ctx, 72, 40, 3.6, '#fef08a', 'rgba(249, 115, 22, 0.96)');
+    drawGlowEye(ctx, 96, 40, 3.6, '#fef08a', 'rgba(249, 115, 22, 0.96)');
+    ctx.fillStyle = '#44403c';
+    drawRoundedPath(ctx, 8, 61 - stride * 0.25, 38, 70, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(141, 76);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-141, -76);
+    ctx.fillStyle = '#fb923c';
+    drawRoundedPath(ctx, 135, 48, 22, 46, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_muspel_elite', 184, 208, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    const aura = ctx.createRadialGradient(92, 104, 18, 92, 104, 86);
+    aura.addColorStop(0, 'rgba(249, 115, 22, 0.34)');
+    aura.addColorStop(1, 'rgba(249, 115, 22, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(92, 104, 86, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 48, 148 - stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    drawRoundedPath(ctx, 104, 148 + stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#292524';
+    drawRoundedPath(ctx, 36, 62, 112, 92, 20);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    drawGlowEye(ctx, 92, 104, 11, '#fffbeb', 'rgba(249, 115, 22, 0.95)');
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 58, 22, 68, 46, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    drawGlowEye(ctx, 78, 45, 4, '#fffbeb', 'rgba(251, 146, 60, 1)');
+    drawGlowEye(ctx, 106, 45, 4, '#fffbeb', 'rgba(251, 146, 60, 1)');
+    ctx.save();
+    ctx.translate(154, 86);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-154, -86);
+    ctx.fillStyle = '#fb923c';
+    drawRoundedPath(ctx, 148, 26, 14, 120, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  // BOSS MUSPELHEIM: Surtr, Signore delle Braci (280x320)
+  registerAnimated('boss_surtr', 280, 320, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    const aura = ctx.createRadialGradient(140, 156, 30, 140, 156, 134);
+    aura.addColorStop(0, 'rgba(249, 115, 22, 0.34)');
+    aura.addColorStop(1, 'rgba(234, 88, 12, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(140, 156, 134, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 74, 224 - stride * 0.9, 48, 78, 13);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    drawRoundedPath(ctx, 158, 224 + stride * 0.9, 48, 78, 13);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(0, bob * 1.1);
+
+    const plate = ctx.createLinearGradient(54, 92, 226, 238);
+    plate.addColorStop(0, '#44403c');
+    plate.addColorStop(0.5, '#1c1917');
+    plate.addColorStop(1, '#090d16');
+    ctx.fillStyle = plate;
+    drawRoundedPath(ctx, 58, 98, 164, 134, 28);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    // Nucleo lavico sul petto
+    const core = ctx.createRadialGradient(140, 162, 6, 140, 162, 38);
+    core.addColorStop(0, '#fffbeb');
+    core.addColorStop(0.35, '#fbbf24');
+    core.addColorStop(0.7, '#ea580c');
+    core.addColorStop(1, 'rgba(234, 88, 12, 0)');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(140, 162, 38, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spallacci vulcanici & corna di fiamma
+    const fireGrad = ctx.createLinearGradient(24, 52, 92, 132);
+    fireGrad.addColorStop(0, '#fef08a');
+    fireGrad.addColorStop(0.5, '#f97316');
+    fireGrad.addColorStop(1, '#9a3412');
+    ctx.fillStyle = fireGrad;
+    for (const [cx, dir] of [[92, -1], [188, 1]]) {
+      ctx.beginPath();
+      ctx.moveTo(cx, 56);
+      ctx.quadraticCurveTo(cx + dir * 40, 26, cx + dir * 32, 4);
+      ctx.quadraticCurveTo(cx + dir * 10, 22, cx - dir * 10, 44);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 94, 37, 92, 70, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+    drawGlowEye(ctx, 120, 69, 5.4, '#fffbeb', 'rgba(249, 115, 22, 0.98)');
+    drawGlowEye(ctx, 160, 69, 5.4, '#fffbeb', 'rgba(249, 115, 22, 0.98)');
+
+    // Spada colossale del crepuscolo di Surtr
+    ctx.save();
+    ctx.translate(242, 148);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-242, -148);
+    ctx.fillStyle = fireGrad;
+    ctx.beginPath();
+    ctx.moveTo(242, 24);
+    ctx.lineTo(264, 62);
+    ctx.lineTo(256, 200);
+    ctx.lineTo(228, 200);
+    ctx.lineTo(220, 62);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = '#44403c';
+    drawRoundedPath(ctx, 214, 198, 56, 14, 5);
+    ctx.fill();
+    ctx.fillRect(236, 212, 12, 34);
+    ctx.restore();
+
+    ctx.restore();
+  });
+
+  registerCanvas(textures, 'fire_bolt', 64, 24, (ctx) => {
+    const fg = ctx.createLinearGradient(6, 12, 60, 12);
+    fg.addColorStop(0, '#ea580c');
+    fg.addColorStop(0.55, '#fb923c');
+    fg.addColorStop(1, '#fffbeb');
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.moveTo(60, 12);
+    ctx.lineTo(18, 3);
+    ctx.lineTo(24, 12);
+    ctx.lineTo(18, 21);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // ===========================================================================
+  // 13. BIOMA HELHEIM (Terreno spettrale, decali, prop, nemici 4x, Hel)
+  // ===========================================================================
+  registerCanvas(textures, 'ground_tile_hel', 512, 512, (ctx, w, h) => {
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#070b11');
+    bg.addColorStop(0.5, '#0c131c');
+    bg.addColorStop(1, '#060a0f');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    const mistPatches = [
+      [92, 82, 130, 0.12],
+      [350, 118, 142, 0.11],
+      [148, 330, 152, 0.12],
+      [402, 382, 124, 0.12]
+    ];
+    for (const [fx, fy, fr, fa] of mistPatches) {
+      const rg = ctx.createRadialGradient(fx, fy, 8, fx, fy, fr);
+      rg.addColorStop(0, `rgba(16, 185, 129, ${fa})`);
+      rg.addColorStop(0.6, `rgba(88, 28, 135, ${fa * 0.45})`);
+      rg.addColorStop(1, 'rgba(7, 11, 17, 0)');
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.arc(fx, fy, fr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const slabs = [
+      [40, 44, 92, 60, -0.04],
+      [268, 138, 108, 66, 0.03],
+      [114, 354, 98, 62, 0.02],
+      [364, 358, 92, 58, -0.05]
+    ];
+    for (const [sx, sy, sw, sh, rot] of slabs) {
+      ctx.save();
+      ctx.translate(sx + sw / 2, sy + sh / 2);
+      ctx.rotate(rot);
+      drawRoundedPath(ctx, -sw / 2, -sh / 2, sw, sh, 10);
+      ctx.fillStyle = '#131d29';
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = 'rgba(52, 211, 153, 0.18)';
+      ctx.stroke();
+      ctx.restore();
+    }
+  });
+
+  registerCanvas(textures, 'decal_hel_rune', 128, 92, (ctx) => {
+    ctx.fillStyle = 'rgba(10, 16, 23, 0.7)';
+    drawRoundedPath(ctx, 10, 12, 108, 68, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(64, 46, 20, 0, Math.PI * 2);
+    ctx.moveTo(52, 34);
+    ctx.lineTo(76, 58);
+    ctx.moveTo(76, 34);
+    ctx.lineTo(52, 58);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_bones', 96, 84, (ctx) => {
+    ctx.strokeStyle = '#94a3b8';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(22, 24);
+    ctx.lineTo(74, 58);
+    ctx.moveTo(74, 24);
+    ctx.lineTo(22, 58);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_mist', 132, 68, (ctx) => {
+    const g = ctx.createRadialGradient(66, 34, 6, 66, 34, 60);
+    g.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+    g.addColorStop(1, 'rgba(10, 16, 23, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(66, 34, 60, 26, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  registerCanvas(textures, 'prop_soul_brazier', 100, 118, (ctx) => {
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 25, 64, 50, 45, 9);
+    ctx.fill();
+    ctx.fillStyle = '#334155';
+    drawRoundedPath(ctx, 16, 50, 68, 18, 7);
+    ctx.fill();
+    const fg = ctx.createRadialGradient(50, 38, 4, 50, 38, 36);
+    fg.addColorStop(0, '#a7f3d0');
+    fg.addColorStop(0.5, '#10b981');
+    fg.addColorStop(1, 'rgba(16, 185, 129, 0)');
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.arc(50, 38, 36, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#34d399';
+    ctx.beginPath();
+    ctx.moveTo(50, 10);
+    ctx.quadraticCurveTo(25, 38, 32, 52);
+    ctx.lineTo(68, 52);
+    ctx.quadraticCurveTo(75, 38, 50, 10);
+    ctx.fill();
+  });
+
+  registerCanvas(textures, 'prop_hel_obelisk', 108, 144, (ctx) => {
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(54, 8);
+    ctx.lineTo(88, 38);
+    ctx.lineTo(90, 130);
+    ctx.lineTo(18, 130);
+    ctx.lineTo(20, 38);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(54, 40);
+    ctx.lineTo(54, 102);
+    ctx.moveTo(38, 64);
+    ctx.lineTo(70, 64);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'prop_dead_tree', 144, 196, (ctx) => {
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 14;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(72, 182);
+    ctx.lineTo(72, 60);
+    ctx.moveTo(72, 110);
+    ctx.lineTo(32, 64);
+    ctx.moveTo(72, 92);
+    ctx.lineTo(112, 48);
+    ctx.moveTo(72, 64);
+    ctx.lineTo(54, 22);
+    ctx.stroke();
+  });
+
+  // Nemici Helheim 4x multi-frame
+  registerAnimated('enemy_hel_swarm', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 36 - stride * 0.4, 94 - stride * 0.7, 16, 34, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 68 + stride * 0.4, 94 + stride * 0.7, 16, 34, 5);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    const body = ctx.createLinearGradient(32, 46, 88, 98);
+    body.addColorStop(0, '#065f46');
+    body.addColorStop(1, '#090d16');
+    ctx.fillStyle = body;
+    drawRoundedPath(ctx, 32, 48, 56, 50, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.ellipse(60, 32, 17, 17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    drawGlowEye(ctx, 53, 33, 2.8, '#ecfdf5', 'rgba(16, 185, 129, 0.98)');
+    drawGlowEye(ctx, 67, 33, 2.8, '#ecfdf5', 'rgba(16, 185, 129, 0.98)');
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_hel_fast', 144, 112, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    for (const [lx, ly] of [[32 - stride * 0.8, 72], [53 + stride * 0.5, 74], [86 + stride * 0.9, 72]]) {
+      ctx.fillStyle = '#0f172a';
+      drawRoundedPath(ctx, lx, ly, 14, 31, 5);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.translate(0, bob * 0.8);
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.ellipse(67, 58, 39, 20, -0.06 + sway * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = '#064e3b';
+    ctx.beginPath();
+    ctx.moveTo(85, 34);
+    ctx.lineTo(100, 12);
+    ctx.lineTo(134, 40);
+    ctx.lineTo(126, 56);
+    ctx.lineTo(92, 58);
+    ctx.closePath();
+    ctx.fill();
+    drawGlowEye(ctx, 110, 37, 3.2, '#a7f3d0', 'rgba(16, 185, 129, 0.98)');
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_hel_archer', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 38 - stride * 0.4, 94 - stride * 0.65, 14, 34, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 68 + stride * 0.4, 94 + stride * 0.65, 14, 34, 5);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#4c1d95';
+    ctx.beginPath();
+    ctx.moveTo(38, 44);
+    ctx.lineTo(24, 112);
+    ctx.quadraticCurveTo(60, 120, 96, 112);
+    ctx.lineTo(82, 44);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#2e1065';
+    ctx.beginPath();
+    ctx.moveTo(38, 42);
+    ctx.quadraticCurveTo(60, 4, 82, 42);
+    ctx.closePath();
+    ctx.fill();
+    drawGlowEye(ctx, 53, 31, 2.7, '#faf5ff', 'rgba(168, 85, 247, 0.98)');
+    drawGlowEye(ctx, 67, 31, 2.7, '#faf5ff', 'rgba(168, 85, 247, 0.98)');
+    ctx.save();
+    ctx.translate(92, 66);
+    ctx.rotate(sway * 0.8);
+    ctx.translate(-92, -66);
+    ctx.strokeStyle = '#c084fc';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(92, 28);
+    ctx.lineTo(92, 108);
+    ctx.stroke();
+    drawGlowEye(ctx, 92, 26, 5, '#ecfdf5', 'rgba(16, 185, 129, 0.95)');
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_hel_berserker', 144, 160, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 40 - stride * 0.5, 110 - stride * 0.85, 21, 40, 6);
+    ctx.fill();
+    drawRoundedPath(ctx, 82 + stride * 0.5, 110 + stride * 0.85, 21, 40, 6);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#3b0764';
+    drawRoundedPath(ctx, 36, 54, 72, 64, 15);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = '#cbd5e1';
+    drawRoundedPath(ctx, 50, 20, 44, 38, 12);
+    ctx.fill();
+    drawGlowEye(ctx, 63, 39, 3.2, '#ecfdf5', 'rgba(16, 185, 129, 1)');
+    drawGlowEye(ctx, 81, 39, 3.2, '#ecfdf5', 'rgba(16, 185, 129, 1)');
+    for (const [ax, dir] of [[24, -1], [120, 1]]) {
+      ctx.save();
+      ctx.translate(ax, 84);
+      ctx.rotate(dir * sway * 1.5);
+      ctx.translate(-ax, -84);
+      ctx.fillStyle = '#a855f7';
+      drawRoundedPath(ctx, ax - 5, 52, 14, 38, 4);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_hel_tank', 168, 192, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 42, 138 - stride * 0.65, 30, 44, 8);
+    ctx.fill();
+    drawRoundedPath(ctx, 96, 138 + stride * 0.65, 30, 44, 8);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob * 0.9);
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 33, 56, 102, 90, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#cbd5e1';
+    drawRoundedPath(ctx, 54, 18, 60, 44, 13);
+    ctx.fill();
+    drawGlowEye(ctx, 72, 40, 3.6, '#ecfdf5', 'rgba(16, 185, 129, 0.96)');
+    drawGlowEye(ctx, 96, 40, 3.6, '#ecfdf5', 'rgba(16, 185, 129, 0.96)');
+    ctx.fillStyle = '#334155';
+    drawRoundedPath(ctx, 8, 61 - stride * 0.25, 38, 70, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(141, 76);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-141, -76);
+    ctx.fillStyle = '#34d399';
+    drawRoundedPath(ctx, 135, 48, 22, 46, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_hel_elite', 184, 208, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    const aura = ctx.createRadialGradient(92, 104, 18, 92, 104, 86);
+    aura.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
+    aura.addColorStop(1, 'rgba(16, 185, 129, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(92, 104, 86, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 48, 148 - stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    drawRoundedPath(ctx, 104, 148 + stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 36, 62, 112, 92, 20);
+    ctx.fill();
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    drawGlowEye(ctx, 92, 104, 11, '#ecfdf5', 'rgba(16, 185, 129, 0.95)');
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 58, 22, 68, 46, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    drawGlowEye(ctx, 78, 45, 4, '#ecfdf5', 'rgba(16, 185, 129, 1)');
+    drawGlowEye(ctx, 106, 45, 4, '#ecfdf5', 'rgba(16, 185, 129, 1)');
+    ctx.save();
+    ctx.translate(154, 86);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-154, -86);
+    ctx.fillStyle = '#c084fc';
+    drawRoundedPath(ctx, 148, 26, 14, 120, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  // BOSS HELHEIM: Hel, Regina degli Abissi (280x320)
+  registerAnimated('boss_hel', 280, 320, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    const aura = ctx.createRadialGradient(140, 156, 30, 140, 156, 134);
+    aura.addColorStop(0, 'rgba(168, 85, 247, 0.28)');
+    aura.addColorStop(0.5, 'rgba(16, 185, 129, 0.2)');
+    aura.addColorStop(1, 'rgba(10, 16, 23, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(140, 156, 134, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 78, 224 - stride * 0.8, 44, 76, 12);
+    ctx.fill();
+    drawRoundedPath(ctx, 158, 224 + stride * 0.8, 44, 76, 12);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob * 1.1);
+
+    const robe = ctx.createLinearGradient(58, 92, 222, 242);
+    robe.addColorStop(0, '#3b0764');
+    robe.addColorStop(0.55, '#0f172a');
+    robe.addColorStop(1, '#064e3b');
+    ctx.fillStyle = robe;
+    drawRoundedPath(ctx, 64, 96, 152, 138, 28);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    // Corona d'ossa e cristalli
+    ctx.fillStyle = '#e2e8f0';
+    ctx.beginPath();
+    ctx.moveTo(94, 48);
+    ctx.lineTo(80, 8);
+    ctx.lineTo(114, 34);
+    ctx.lineTo(140, 4);
+    ctx.lineTo(166, 34);
+    ctx.lineTo(200, 8);
+    ctx.lineTo(186, 48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 98, 40, 84, 66, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    drawGlowEye(ctx, 122, 70, 5.2, '#ecfdf5', 'rgba(16, 185, 129, 0.98)');
+    drawGlowEye(ctx, 158, 70, 5.2, '#faf5ff', 'rgba(168, 85, 247, 0.98)');
+
+    // Anelli runici fluttuanti attorno alle mani
+    ctx.save();
+    ctx.translate(140, 162);
+    ctx.rotate(sway * 1.4);
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(-84, 0, 26, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#c084fc';
+    ctx.beginPath();
+    ctx.arc(84, 0, 26, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  });
+
+  registerCanvas(textures, 'shadow_bolt', 64, 24, (ctx) => {
+    const sg = ctx.createLinearGradient(6, 12, 60, 12);
+    sg.addColorStop(0, '#7e22ce');
+    sg.addColorStop(0.55, '#a855f7');
+    sg.addColorStop(1, '#a7f3d0');
+    ctx.fillStyle = sg;
+    ctx.beginPath();
+    ctx.moveTo(60, 12);
+    ctx.lineTo(18, 3);
+    ctx.lineTo(24, 12);
+    ctx.lineTo(18, 21);
+    ctx.closePath();
+    ctx.fill();
+  });
 }
