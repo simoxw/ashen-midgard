@@ -376,7 +376,8 @@ test('GameScene: texture procedurali, movimento a Nord (Y < 0), spawning, armi, 
   assert.equal(scene.gameState, 'PLAYING');
   assert.equal(scene.bladeSprites.length, 2);
 
-  // Forza attivazione fulmini e aura
+  // Forza attivazione fulmini e aura con almeno un nemico nel raggio
+  scene._spawnEnemy('swarm', 0, 0, 120);
   scene.timers.aura = 0;
   scene.timers.lightning = 0;
   scene.update(9000, 33);
@@ -731,14 +732,16 @@ test('Anti-Incastro Ostacoli, Zero-GC Pool & Prontezza GitHub Pages PWA', async 
   assert.equal(scene.joyActive, false, 'Joystick deve resettarsi se pointer.isDown è false');
   assert.equal(scene.joyVec.x, 0);
 
-  // 5. Verifica pubblicazione diretta GitHub Pages da branch main / (root) senza dipendere da GitHub Actions + AI Studio ('/')
+  // 5. Verifica pubblicazione GitHub Pages statica senza npm install + AI Studio ('/')
   const root = process.cwd();
   const viteSrc = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
   const htmlSrc = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const manifestSrc = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
   const swSrc = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  const deployYml = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
   assert.equal(fs.existsSync(path.join(root, '.nojekyll')), true, '.nojekyll deve esistere nella root per GitHub Pages');
-  assert.equal(fs.existsSync(path.join(root, '.github/workflows/deploy.yml')), false, 'Nessun workflow Actions fallimentare deve bloccare il deploy diretto da branch');
+  assert.ok(deployYml.includes('actions/deploy-pages@v4') && deployYml.includes('actions/configure-pages@v5'), 'deploy.yml deve pubblicare con configure-pages + deploy-pages');
+  assert.equal(deployYml.includes('npm install'), false, 'deploy.yml non deve eseguire npm install');
   assert.equal(manifestSrc.start_url, './', 'manifest.json deve usare start_url relativo ./');
   assert.equal(manifestSrc.scope, './', 'manifest.json deve usare scope relativo ./');
   assert.ok(viteSrc.includes('VITE_BASE_PATH') && viteSrc.includes(": '/'"), 'vite.config.ts deve supportare / in AI Studio');
