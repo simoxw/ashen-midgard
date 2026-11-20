@@ -1,14 +1,20 @@
 /**
  * Service Worker PWA per Ashen Midgard
- * - Codice, HTML e configurazioni (index.html, src/*.js, story.json): Network-First con revalidazione
- *   così ogni aggiornamento viene applicato subito senza restare bloccati su vecchie versioni.
- * - Immagini e media: Stale-While-Revalidate per caricamento istantaneo + aggiornamento in background.
- * - Librerie CDN versionate e Google Fonts: Cache-First con fallback offline completo.
+ * - In anteprima AI Studio (ais-dev / ais-pre): si auto-disattiva per non interferire con cookie/iframe/HMR.
+ * - Su GitHub Pages e PWA installata:
+ *   - Navigazioni HTML: passa sempre la request originale (mai redirect seguiti manualmente su navigate -> zero ERR_FAILED)
+ *     con fallback offline a ./index.html.
+ *   - Codice JS/JSON/CSS: Network-First con aggiornamento immediato.
+ *   - Immagini/Media: Stale-While-Revalidate + Font Cache-First.
  */
 
-const CACHE_VERSION = 'v4-1';
+const CACHE_VERSION = 'v4-2';
 const CACHE_NAME = `ashen-midgard-${CACHE_VERSION}`;
 const FONT_CACHE = 'ashen-midgard-fonts-v1';
+
+const IS_AISTUDIO_PREVIEW =
+  self.location.hostname.startsWith('ais-dev-') ||
+  self.location.hostname.startsWith('ais-pre-');
 
 // Risorse essenziali da pre-caricare in installazione (bypassando la HTTP cache del browser)
 const PRECACHE_ASSETS = [
@@ -42,6 +48,11 @@ const PRECACHE_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  if (IS_AISTUDIO_PREVIEW) {
+    event.waitUntil(self.skipWaiting());
+    return;
+  }
+
   event.waitUntil(
     caches
       .open(CACHE_NAME)
@@ -67,6 +78,17 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
+  if (IS_AISTUDIO_PREVIEW) {
+    event.waitUntil(
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => self.registration.unregister())
+        .then(() => self.clients.claim())
+    );
+    return;
+  }
+
   event.waitUntil(
     caches
       .keys()
@@ -81,19 +103,33 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-function isCodeOrDocument(request, url) {
+function isCodeOrConfig(url) {
   if (url.origin !== self.location.origin) return false;
-  if (request.mode === 'navigate') return true;
   const p = url.pathname;
   return (
-    p === '/' ||
-    p.endsWith('/') ||
-    p.endsWith('.html') ||
     p.endsWith('.js') ||
     p.endsWith('.mjs') ||
     p.endsWith('.css') ||
     p.endsWith('.json')
   );
+}
+
+async function handleNavigate(request) {
+  try {
+    // Usa request originale (redirect: 'manual' del browser) per evitare ERR_FAILED su redirect 301/302
+    const networkResponse = await fetch(request);
+    if (networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put('./index.html', networkResponse.clone());
+    }
+    return networkResponse;
+  } catch {
+    const cached =
+      (await caches.match('./index.html')) ||
+      (await caches.match('./')) ||
+      (await caches.match(request, { ignoreSearch: true }));
+    return cached || new Response('Offline', { status: 503, statusText: 'Offline' });
+  }
 }
 
 async function networkFirst(request) {
@@ -116,10 +152,6 @@ async function networkFirst(request) {
 
   const cached = await caches.match(request, { ignoreSearch: true });
   if (cached) return cached;
-  if (request.mode === 'navigate') {
-    const fallback = await caches.match('./index.html');
-    if (fallback) return fallback;
-  }
   return new Response('', { status: 504, statusText: 'Offline' });
 }
 
@@ -148,21 +180,31 @@ async function staleWhileRevalidate(request, url) {
 }
 
 self.addEventListener('fetch', (event) => {
+  if (IS_AISTUDIO_PREVIEW) return;
+
   const { request } = event;
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
   if (!url.protocol.startsWith('http')) return;
 
-  // Non intercettare mai sw.js né gli endpoint interni di Vite dev server
+  // Non intercettare mai sw.js, endpoint Vite dev o endpoint proxy AI Studio
   if (
     url.origin === self.location.origin &&
     (url.pathname.endsWith('/sw.js') ||
       url.pathname.startsWith('/@vite/') ||
       url.pathname.startsWith('/@fs/') ||
       url.pathname.startsWith('/@id/') ||
-      url.pathname.startsWith('/node_modules/'))
+      url.pathname.startsWith('/node_modules/') ||
+      url.pathname.startsWith('/__cookie_check') ||
+      url.pathname.startsWith('/_aistudio'))
   ) {
+    return;
+  }
+
+  // Navigazioni HTML sicure (preserva redirect nativi ed evita ERR_FAILED in iframe)
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigate(request));
     return;
   }
 
@@ -186,8 +228,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Codice applicativo, HTML e JSON: Network-First per avere sempre l'ultima versione
-  if (isCodeOrDocument(request, url)) {
+  // Codice applicativo e JSON: Network-First per avere sempre l'ultima versione
+  if (isCodeOrConfig(url)) {
     event.respondWith(networkFirst(request));
     return;
   }

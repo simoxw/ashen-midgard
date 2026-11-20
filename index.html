@@ -1196,27 +1196,46 @@
     <script type="module" src="./src/main.js"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        const hadController = Boolean(navigator.serviceWorker.controller);
-        let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          if (!hadController || refreshing) return;
-          refreshing = true;
-          window.location.reload();
-        });
+        const isPreviewHost =
+          window.location.hostname.startsWith('ais-dev-') ||
+          window.location.hostname.startsWith('ais-pre-');
 
-        window.addEventListener('load', async () => {
-          try {
-            const reg = await navigator.serviceWorker.register('./sw.js', {
-              updateViaCache: 'none'
-            });
-            reg.update().catch(() => {});
-            document.addEventListener('visibilitychange', () => {
-              if (!document.hidden) reg.update().catch(() => {});
-            });
-          } catch {
-            // Ignora errori di registrazione SW
-          }
-        });
+        if (isPreviewHost) {
+          window.addEventListener('load', async () => {
+            try {
+              const regs = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(regs.map((r) => r.unregister()));
+              if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map((k) => caches.delete(k)));
+              }
+            } catch {
+              // Ignora errori cleanup preview
+            }
+          });
+        } else {
+          const hadController = Boolean(navigator.serviceWorker.controller);
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!hadController || refreshing) return;
+            refreshing = true;
+            window.location.reload();
+          });
+
+          window.addEventListener('load', async () => {
+            try {
+              const reg = await navigator.serviceWorker.register('./sw.js', {
+                updateViaCache: 'none'
+              });
+              reg.update().catch(() => {});
+              document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) reg.update().catch(() => {});
+              });
+            } catch {
+              // Ignora errori di registrazione SW
+            }
+          });
+        }
       }
     </script>
   </body>
