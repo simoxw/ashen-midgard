@@ -2,17 +2,55 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
-import {defineConfig} from 'vite';
+import {defineConfig, loadEnv} from 'vite';
 
-export default defineConfig(() => {
-  const base = process.env.GITHUB_ACTIONS === 'true' ? '/ashen-midgard/' : '/';
+function collectDistAssetUrls(distDir: string): string[] {
+  const assetsDir = path.join(distDir, 'assets');
+  if (!fs.existsSync(assetsDir)) return [];
+  const results: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'aistudio') continue;
+        walk(full);
+      } else if (!entry.name.endsWith('.map')) {
+        const rel = path.relative(distDir, full).replace(/\\/g, '/');
+        results.push(`./${rel}`);
+      }
+    }
+  };
+  walk(assetsDir);
+  return results;
+}
+
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, '.', '');
+  const rawBase =
+    env.VITE_BASE_PATH ||
+    process.env.VITE_BASE_PATH ||
+    (process.env.GITHUB_ACTIONS === 'true' ? '/ashen-midgard/' : '/');
+  const base = rawBase.endsWith('/') ? rawBase : `${rawBase}/`;
+
   return {
     base,
     plugins: [
       react(),
       tailwindcss(),
-      // Copies static PWA files, story.json, icons, and assets into dist/ so both
-      // direct GitHub Pages hosting and Vite production builds resolve cleanly.
+      // Assicura che /sw.js non venga mai servito da cache HTTP in dev/preview
+      {
+        name: 'sw-nocache-headers',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            if (req.url?.split('?')[0] === '/sw.js') {
+              res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+              res.setHeader('Pragma', 'no-cache');
+            }
+            next();
+          });
+        },
+      },
+      // Copia i file PWA statici, story.json, icone, asset e aggiorna la versione cache di dist/sw.js
       {
         name: 'copy-static-game-assets',
         apply: 'build',
@@ -38,6 +76,8 @@ export default defineConfig(() => {
             }
           }
 
+          const distAssetUrls = collectDistAssetUrls(distDir);
+
           const staticFiles = [
             'manifest.json',
             'sw.js',
@@ -47,15 +87,35 @@ export default defineConfig(() => {
             'pwa-192x192.png',
             'pwa-512x512.png',
             'pwa-maskable-512x512.png',
+            '.nojekyll',
           ];
           for (const fileName of staticFiles) {
             const fromFile = path.resolve(__dirname, fileName);
             const toFile = path.resolve(distDir, fileName);
             if (fs.existsSync(fromFile)) {
               if (fileName === 'sw.js') {
+                const buildAssets = Array.from(
+                  new Set([
+                    './',
+                    './index.html',
+                    './manifest.json',
+                    './story.json',
+                    './icon.svg',
+                    './apple-touch-icon.png',
+                    './pwa-192x192.png',
+                    './pwa-512x512.png',
+                    './pwa-maskable-512x512.png',
+                    ...distAssetUrls,
+                    'https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js',
+                  ]),
+                );
                 const swContent = fs
                   .readFileSync(fromFile, 'utf8')
-                  .replace(/const CACHE_VERSION = '[^']+';/, `const CACHE_VERSION = 'build-${Date.now()}';`);
+                  .replace(/const CACHE_VERSION = '[^']+';/, `const CACHE_VERSION = 'build-${Date.now()}';`)
+                  .replace(
+                    /const PRECACHE_ASSETS = \[[\s\S]*?\];/,
+                    `const PRECACHE_ASSETS = ${JSON.stringify(buildAssets, null, 2)};`,
+                  );
                 fs.writeFileSync(toFile, swContent);
               } else {
                 fs.copyFileSync(fromFile, toFile);

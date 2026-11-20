@@ -1,20 +1,23 @@
 /**
  * Service Worker PWA per Ashen Midgard
- * - In anteprima AI Studio (ais-dev / ais-pre): si auto-disattiva per non interferire con cookie/iframe/HMR.
+ * - In anteprima AI Studio (ais-dev / ais-pre / *.run.app): non intercetta mai fetch,
+ *   cancella tutte le cache esistenti e si auto-disinstalla immediatamente.
  * - Su GitHub Pages e PWA installata:
+ *   - Ad ogni nuova versione/build crea una cache nuova (CACHE_NAME) e rimuove TUTTE
+ *     le cache precedenti in activate.
  *   - Navigazioni HTML: passa sempre la request originale (mai redirect seguiti manualmente su navigate -> zero ERR_FAILED)
  *     con fallback offline a ./index.html.
  *   - Codice JS/JSON/CSS: Network-First con aggiornamento immediato.
- *   - Immagini/Media: Stale-While-Revalidate + Font Cache-First.
+ *   - Immagini/Media/Font: aggiornamento in background nella stessa CACHE_NAME versionata.
  */
 
-const CACHE_VERSION = 'v4-2';
+const CACHE_VERSION = 'v4-3';
 const CACHE_NAME = `ashen-midgard-${CACHE_VERSION}`;
-const FONT_CACHE = 'ashen-midgard-fonts-v1';
 
 const IS_AISTUDIO_PREVIEW =
   self.location.hostname.startsWith('ais-dev-') ||
-  self.location.hostname.startsWith('ais-pre-');
+  self.location.hostname.startsWith('ais-pre-') ||
+  self.location.hostname.endsWith('.run.app');
 
 // Risorse essenziali da pre-caricare in installazione (bypassando la HTTP cache del browser)
 const PRECACHE_ASSETS = [
@@ -89,13 +92,14 @@ self.addEventListener('activate', (event) => {
     return;
   }
 
+  // Elimina OGNI cache precedente diversa dalla nuova CACHE_NAME
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== CACHE_NAME && key !== FONT_CACHE)
+            .filter((key) => key !== CACHE_NAME)
             .map((oldKey) => caches.delete(oldKey))
         )
       )
@@ -179,61 +183,61 @@ async function staleWhileRevalidate(request, url) {
   return networkResponse || new Response('', { status: 504, statusText: 'Offline' });
 }
 
-self.addEventListener('fetch', (event) => {
-  if (IS_AISTUDIO_PREVIEW) return;
+if (!IS_AISTUDIO_PREVIEW) {
+  self.addEventListener('fetch', (event) => {
+    const { request } = event;
+    if (request.method !== 'GET') return;
 
-  const { request } = event;
-  if (request.method !== 'GET') return;
+    const url = new URL(request.url);
+    if (!url.protocol.startsWith('http')) return;
 
-  const url = new URL(request.url);
-  if (!url.protocol.startsWith('http')) return;
+    // Non intercettare mai sw.js, endpoint Vite dev o endpoint proxy AI Studio
+    if (
+      url.origin === self.location.origin &&
+      (url.pathname.endsWith('/sw.js') ||
+        url.pathname.startsWith('/@vite/') ||
+        url.pathname.startsWith('/@fs/') ||
+        url.pathname.startsWith('/@id/') ||
+        url.pathname.startsWith('/node_modules/') ||
+        url.pathname.startsWith('/__cookie_check') ||
+        url.pathname.startsWith('/_aistudio'))
+    ) {
+      return;
+    }
 
-  // Non intercettare mai sw.js, endpoint Vite dev o endpoint proxy AI Studio
-  if (
-    url.origin === self.location.origin &&
-    (url.pathname.endsWith('/sw.js') ||
-      url.pathname.startsWith('/@vite/') ||
-      url.pathname.startsWith('/@fs/') ||
-      url.pathname.startsWith('/@id/') ||
-      url.pathname.startsWith('/node_modules/') ||
-      url.pathname.startsWith('/__cookie_check') ||
-      url.pathname.startsWith('/_aistudio'))
-  ) {
-    return;
-  }
+    // Navigazioni HTML sicure (preserva redirect nativi ed evita ERR_FAILED in iframe)
+    if (request.mode === 'navigate') {
+      event.respondWith(handleNavigate(request));
+      return;
+    }
 
-  // Navigazioni HTML sicure (preserva redirect nativi ed evita ERR_FAILED in iframe)
-  if (request.mode === 'navigate') {
-    event.respondWith(handleNavigate(request));
-    return;
-  }
-
-  // Cache a lungo termine per Google Fonts
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.open(FONT_CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
-        if (cached) return cached;
-        try {
-          const networkResponse = await fetch(request);
-          if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
-            cache.put(request, networkResponse.clone());
+    // Google Fonts nella stessa cache versionata
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
+      event.respondWith(
+        caches.open(CACHE_NAME).then(async (cache) => {
+          const cached = await cache.match(request);
+          if (cached) return cached;
+          try {
+            const networkResponse = await fetch(request);
+            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
+              cache.put(request, networkResponse.clone());
+            }
+            return networkResponse;
+          } catch {
+            return cached || Response.error();
           }
-          return networkResponse;
-        } catch {
-          return cached || Response.error();
-        }
-      })
-    );
-    return;
-  }
+        })
+      );
+      return;
+    }
 
-  // Codice applicativo e JSON: Network-First per avere sempre l'ultima versione
-  if (isCodeOrConfig(url)) {
-    event.respondWith(networkFirst(request));
-    return;
-  }
+    // Codice applicativo e JSON: Network-First per avere sempre l'ultima versione
+    if (isCodeOrConfig(url)) {
+      event.respondWith(networkFirst(request));
+      return;
+    }
 
-  // Immagini, icone e risorse statiche: Stale-While-Revalidate (veloce + aggiornamento automatico)
-  event.respondWith(staleWhileRevalidate(request, url));
-});
+    // Immagini, icone e risorse statiche: Stale-While-Revalidate
+    event.respondWith(staleWhileRevalidate(request, url));
+  });
+}

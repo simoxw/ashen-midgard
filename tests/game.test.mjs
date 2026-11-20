@@ -720,14 +720,17 @@ test('Anti-Incastro Ostacoli, Zero-GC Pool & Prontezza GitHub Pages PWA', async 
   assert.equal(scene.joyActive, false, 'Joystick deve resettarsi se pointer.isDown è false');
   assert.equal(scene.joyVec.x, 0);
 
-  // 5. Verifica configurazione doppia AI Studio ('/') + GitHub Pages ('ashen-midgard' / root './')
+  // 5. Verifica configurazione doppia AI Studio ('/') + GitHub Pages ('ashen-midgard' / Actions workflow) + pulizia totale cache
   const root = process.cwd();
   const viteSrc = fs.readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
   const htmlSrc = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const swSrc = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.ok(viteSrc.includes("'/ashen-midgard/'") && viteSrc.includes(": '/'"), 'vite.config.ts deve usare / in AI Studio e /ashen-midgard/ in GitHub Actions');
+  const deployYml = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
+  assert.ok(viteSrc.includes('VITE_BASE_PATH') && viteSrc.includes("'/ashen-midgard/'") && viteSrc.includes(": '/'"), 'vite.config.ts deve supportare VITE_BASE_PATH, / in AI Studio e /ashen-midgard/ in GitHub Actions');
   assert.equal(viteSrc.includes("base: './'"), false, 'vite.config.ts non deve forzare base ./ in dev server');
-  assert.ok(htmlSrc.includes('src="./src/main.js"') && htmlSrc.includes("register('./sw.js'"), 'index.html deve usare percorsi relativi ./ per GitHub Pages root');
+  assert.ok(deployYml.includes('actions/deploy-pages@v4') && deployYml.includes('VITE_BASE_PATH'), 'deploy.yml deve pubblicare dist su GitHub Pages');
+  assert.ok(htmlSrc.includes('src="./src/main.js"') && htmlSrc.includes("register('./sw.js'"), 'index.html deve usare percorsi relativi ./');
+  assert.ok(swSrc.includes('key !== CACHE_NAME') && !swSrc.includes('FONT_CACHE'), 'sw.js deve eliminare ogni vecchia cache diversa da CACHE_NAME');
   assert.equal(swSrc.includes('__ASHEN_BUILD'), false, 'sw.js deve avere una versione esplicita pronta senza build');
 
   globalThis.document = prevDoc;
