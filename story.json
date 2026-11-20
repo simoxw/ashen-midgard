@@ -213,6 +213,56 @@
           "particles": "frost"
         }
       ]
+    },
+    "juggernaut": {
+      "onGameStart": [
+        {
+          "speaker": "Bjorn, Martello di Ferro",
+          "text": "Ho forgiato questo maglio nelle viscere di Nidavellir. Nessuna marea di ghiaccio può spezzare il ferro di Midgard.",
+          "image": "./assets/story/bjorn_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Bjorn, Martello di Ferro",
+          "text": "Reggi l'urto per quattro minuti e frantuma i campioni degli Jotun: quando Hrimthurs scenderà in campo, sentirà il peso del tuono!",
+          "image": "./assets/story/bjorn_intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Bjorn, Martello di Ferro",
+          "text": "Un solo colpo sismico ha ridotto in polvere lo scettro glaciale del tiranno. Le montagne rispondono al ruggito della nostra vittoria!",
+          "image": "./assets/story/bjorn_victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "embers"
+        },
+        {
+          "speaker": "Cronache dei Fabbro-Re",
+          "text": "Il ferro di Bjorn rimarrà piantato nella neve sciolta come monumento eterno contro le tenebre del nord.",
+          "image": "./assets/story/bjorn_victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "embers"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco del Fimbulvetr",
+          "text": "Perfino le piastre d'acciaio più spesse cedono sotto l'assedio infinito. Il martello riposa nella cenere gelata.",
+          "image": "./assets/story/bjorn_gameover.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "frost"
+        },
+        {
+          "speaker": "Bjorn, Martello di Ferro",
+          "text": "Ritempra l'incudine e affila le rune. Tornerò in piedi finché l'ultimo gigante non sarà caduto.",
+          "image": "./assets/story/bjorn_gameover.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "frost"
+        }
+      ]
     }
   }
 }

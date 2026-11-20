@@ -255,6 +255,12 @@ const {
   loadMetaProgress,
   grantHeroMetaXp
 } = await import('../src/heroes.js');
+const {
+  CODEX_ENTRIES,
+  CODEX_STORAGE_KEY,
+  getCodexView,
+  recordRunCodexProgress
+} = await import('../src/codex.js');
 
 test('2.5D Depth Layers: entità sempre sopra terreno e ombre anche con Y negative', () => {
   const testYs = [-100000, -1500, -250, -1, 0, 1, 250, 1500, 100000];
@@ -434,9 +440,9 @@ test('Config PWA & Story: manifest.json, story.json e file statici presenti', ()
     }
   }
 
-  // Verifica storie e immagini dedicate per tutti e 3 gli eroi
+  // Verifica storie e immagini dedicate per tutti e 4 gli eroi
   assert.equal(GAME_CONFIG.RUN_DURATION_SEC, 240, 'Il boss deve arrivare dopo 4 minuti (240s)');
-  for (const heroId of ['warrior', 'assassin', 'mage']) {
+  for (const heroId of ['warrior', 'assassin', 'mage', 'juggernaut']) {
     const heroStory = story.heroes?.[heroId];
     assert.ok(heroStory, `Storia eroe mancante: ${heroId}`);
     for (const trigger of ['onGameStart', 'onVictory', 'onGameOver']) {
@@ -451,6 +457,7 @@ test('Config PWA & Story: manifest.json, story.json e file statici presenti', ()
   const swSource = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   assert.ok(swSource.includes('networkFirst'), 'sw.js deve usare networkFirst per codice e HTML');
   assert.ok(swSource.includes("cache: 'reload'"), 'sw.js deve bypassare HTTP cache in installazione');
+  assert.ok(swSource.includes('./src/codex.js') && swSource.includes('./assets/story/bjorn_intro.jpg'), 'sw.js deve pre-caricare codex.js e immagini storia di Bjorn');
   const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.ok(htmlSource.includes("updateViaCache: 'none'"), 'index.html deve registrare SW con updateViaCache: none');
   assert.ok(htmlSource.includes('controllerchange'), 'index.html deve gestire reload su controllerchange');
@@ -501,9 +508,12 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
     }
   });
   for (const expectedKey of [
-    'ground_tile', 'hero_warrior', 'hero_assassin', 'hero_mage',
-    'enemy_swarm', 'enemy_fast', 'enemy_tank', 'boss',
-    'prop_tree', 'prop_rock', 'prop_brazier', 'shadow_ellipse',
+    'ground_tile', 'hero_warrior', 'hero_assassin', 'hero_mage', 'hero_juggernaut',
+    'hero_warrior_f0', 'hero_warrior_f1', 'hero_warrior_f2', 'hero_warrior_f3',
+    'hero_juggernaut_f1', 'enemy_swarm', 'enemy_swarm_f1',
+    'enemy_fast', 'enemy_tank', 'enemy_archer', 'enemy_berserker', 'enemy_elite', 'boss', 'boss_f2',
+    'prop_tree', 'prop_rock', 'prop_brazier', 'prop_crate', 'prop_shrine',
+    'chest_valhalla', 'frost_arrow', 'meat_pickup', 'magnet_pickup', 'shadow_ellipse',
     'axe_proj', 'dagger_proj', 'orb_proj', 'blade_proj',
     'gem_blue', 'gem_green', 'gem_gold'
   ]) {
@@ -512,6 +522,7 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
   assert.deepEqual(registered.get('hero_warrior'), { width: 144, height: 168 });
   assert.deepEqual(registered.get('hero_assassin'), { width: 144, height: 168 });
   assert.deepEqual(registered.get('hero_mage'), { width: 144, height: 168 });
+  assert.deepEqual(registered.get('hero_juggernaut'), { width: 144, height: 168 });
   assert.deepEqual(registered.get('enemy_swarm'), { width: 120, height: 136 });
   assert.deepEqual(registered.get('enemy_fast'), { width: 144, height: 112 });
   assert.deepEqual(registered.get('enemy_tank'), { width: 168, height: 192 });
@@ -530,8 +541,8 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
   assert.equal(bossSlides[0].image, './assets/story/boss.jpg');
 });
 
-test('Heroes & Meta-Progression: 3 eroi, armi sbloccabili e EXP permanente', () => {
-  assert.deepEqual(HERO_ORDER, ['warrior', 'assassin', 'mage']);
+test('Heroes & Meta-Progression: 4 eroi, armi sbloccabili e EXP permanente', () => {
+  assert.deepEqual(HERO_ORDER, ['warrior', 'assassin', 'mage', 'juggernaut']);
   for (const id of HERO_ORDER) {
     const h = HERO_ROSTER[id];
     assert.equal(h.weapons.length, 3);
@@ -736,4 +747,115 @@ test('Anti-Incastro Ostacoli, Zero-GC Pool & Prontezza GitHub Pages PWA', async 
   globalThis.document = prevDoc;
 });
 
+test('Espansione Gameplay: Bjorn + Martello Sismico, Evoluzioni, Mini-Boss/Forziere, Casse, Altari, Arciere e Codex', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  const scene = new GameScene();
+  const bridgeEvents = {
+    levelUpChoices: null,
+    chestReward: null,
+    hud: null
+  };
+  scene.configureBridge(
+    {
+      onLevelUp: (choices) => { bridgeEvents.levelUpChoices = choices; },
+      onChestOpened: (reward) => { bridgeEvents.chestReward = reward; },
+      onHudUpdate: (data) => { bridgeEvents.hud = data; }
+    },
+    null
+  );
+  scene.preload();
+  scene.create();
+
+  // 1. Bjorn (juggernaut) + Martello Sismico
+  const bjornPerks = getPerksForHeroLevel('juggernaut', 1);
+  await scene.startNewRun({
+    heroId: 'juggernaut',
+    startingWeaponId: 'hammer',
+    textureKey: 'hero_juggernaut',
+    effectiveStats: bjornPerks
+  });
+  assert.equal(scene.hero.texture, 'hero_juggernaut');
+  assert.equal(scene.levels.hammer, 1);
+
+  scene._spawnEnemy('swarm', 0, 0, 60);
+  const swarm = scene.activeEnemies[0];
+  const swarmBefore = swarm.hp;
+  scene.timers.hammer = 0;
+  scene.update(100, 33);
+  assert.ok(swarm.hp < swarmBefore || scene.kills >= 1, 'Martello Sismico deve colpire o abbattere ad area i nemici vicini');
+  assert.ok(scene.activeExplosions.length >= 1, 'Martello Sismico deve generare onda VFX');
+
+  // 2. Evoluzione Arma (Ascia Lv.5 + Furia di Tyr Lv.1 -> Ascia Cremisi del Ragnarok)
+  scene.levels.axe = 5;
+  scene.levels.might = 1;
+  const evos = scene._getAvailableEvolutions();
+  assert.equal(evos.some((e) => e.weaponId === 'axe'), true);
+  scene._openLevelUpScreen();
+  assert.equal(bridgeEvents.levelUpChoices[0].isEvolution, true);
+  assert.equal(bridgeEvents.levelUpChoices[0].id, 'evo_axe');
+  scene.applyUpgrade('evo_axe');
+  assert.equal(scene.evolvedWeapons.axe, true);
+  assert.equal(scene.evolutionsForged, 1);
+
+  // 3. Mini-Boss Elite + Forziere del Valhalla
+  scene._spawnMiniBoss(0);
+  assert.ok(scene.activeMiniBoss && scene.activeMiniBoss.isMiniBoss === true);
+  assert.equal(scene.activeMiniBoss.isBoss, false);
+  scene._killEnemy(scene.activeMiniBoss);
+  assert.equal(scene.miniBossesSlain, 1);
+  assert.equal(scene.bossDefeated, false, 'Sconfiggere un mini-boss non deve attivare la vittoria finale');
+  const chestPickup = scene.pickupItems.find((p) => p.active && p.kind === 'chest');
+  assert.ok(chestPickup, 'Il mini-boss deve rilasciare un forziere');
+  scene.hero.setPosition(chestPickup.x, chestPickup.y);
+  scene._updatePickups(0.016);
+  assert.equal(scene.gameState, 'CHEST');
+  assert.ok(bridgeEvents.chestReward && bridgeEvents.chestReward.title);
+  scene.resumeGame();
+  assert.equal(scene.gameState, 'PLAYING');
+
+  // 4. Casse distruttibili, Altari Runici e Arciere di Brina
+  const crate = scene.crateItems.find((c) => c.activeCrate);
+  assert.ok(crate);
+  const broke = scene._damageCratesInRadius(crate.x, crate.y, 40);
+  assert.equal(broke, true);
+  assert.equal(scene.cratesBroken, 1);
+
+  const shrine = scene.shrineItems[0];
+  scene._activateShrine(shrine);
+  assert.equal(scene.shrinesActivated, 1);
+  assert.ok(scene.activeBuff && scene.activeBuff.remaining > 0);
+  assert.ok(bridgeEvents.hud?.buff, 'Il buff attivo dell altare deve essere sincronizzato nell HUD');
+
+  scene._spawnEnemy('archer', 0, 0, 200);
+  const archer = scene.activeEnemies.find((e) => e.archetype === 'archer');
+  assert.ok(archer);
+  scene._fireEnemyFrostArrow(archer, scene.hero.x, scene.hero.y);
+  assert.equal(scene.activeEnemyProjectiles.length, 1);
+  assert.equal(scene.activeEnemyProjectiles[0].texture, 'frost_arrow');
+
+  // 5. Codex delle Rune persistente
+  localStorage.removeItem(CODEX_STORAGE_KEY);
+  const initialCodex = getCodexView();
+  assert.equal(initialCodex.totalCount, CODEX_ENTRIES.length);
+  assert.ok(initialCodex.unlockedCount >= 4);
+
+  const codexProgress = recordRunCodexProgress({
+    heroId: 'juggernaut',
+    kills: 150,
+    elapsedSec: 100,
+    cratesBroken: 4,
+    shrinesActivated: 2,
+    miniBossesSlain: 1,
+    evolutionsForged: 1,
+    bossDefeated: true,
+    victory: true
+  });
+  assert.ok(codexProgress.newlyUnlocked.length >= 6);
+  const afterCodex = getCodexView();
+  assert.equal(afterCodex.unlockedCount > initialCodex.unlockedCount, true);
+
+  globalThis.document = prevDoc;
+});
 

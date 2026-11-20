@@ -64,10 +64,30 @@ export const HERO_ROSTER = {
       { id: 'lightning', name: 'Saetta di Thor', unlockLevel: 2, role: 'Secondaria I' },
       { id: 'aura', name: 'Aura del Crepuscolo', unlockLevel: 4, role: 'Secondaria II' }
     ]
+  },
+  juggernaut: {
+    id: 'juggernaut',
+    name: 'Bjorn',
+    title: 'Martello di Ferro',
+    textureKey: 'hero_juggernaut',
+    accent: '#fb923c',
+    summary: 'Colosso corazzato con onde d’urto sismiche e grande resistenza.',
+    baseStats: {
+      maxHp: 138,
+      speed: 128,
+      mightMult: 1.12,
+      areaMult: 1.15,
+      critChance: 0.14
+    },
+    weapons: [
+      { id: 'hammer', name: 'Martello Sismico', unlockLevel: 1, role: 'Arma Base' },
+      { id: 'aura', name: 'Aura del Crepuscolo', unlockLevel: 2, role: 'Secondaria I' },
+      { id: 'axe', name: 'Ascia Runica', unlockLevel: 4, role: 'Secondaria II' }
+    ]
   }
 };
 
-export const HERO_ORDER = ['warrior', 'assassin', 'mage'];
+export const HERO_ORDER = ['warrior', 'assassin', 'mage', 'juggernaut'];
 
 // Soglie EXP cumulativa per i livelli permanenti di ciascun eroe
 export function getXpRequiredForLevel(level) {
@@ -140,12 +160,14 @@ export function createDefaultMetaState() {
     selectedWeapons: {
       warrior: 'axe',
       assassin: 'dagger',
-      mage: 'orb'
+      mage: 'orb',
+      juggernaut: 'hammer'
     },
     heroXp: {
       warrior: 0,
       assassin: 0,
-      mage: 0
+      mage: 0,
+      juggernaut: 0
     }
   };
 }

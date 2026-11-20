@@ -18,13 +18,21 @@ import {
   grantHeroMetaXp
 } from './heroes.js';
 
+import {
+  CODEX_CATEGORIES,
+  getCodexView,
+  loadCodexState,
+  recordRunCodexProgress
+} from './codex.js';
+
 const RECORDS_STORAGE_KEY = 'ashen_midgard_records_v1';
 
 // Icone SVG nitide per gli eroi nel selettore
 const HERO_PORTRAITS = {
   warrior: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l6 4v5c0 4-3 7-6 9-3-2-6-5-6-9V7l6-4z" fill="currentColor" fill-opacity="0.2"/><path d="M9 11l3 3 3-3"/></svg>',
   assassin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5M15 5h4v4"/><path d="M19 19L5 5M5 9V5h4"/></svg>',
-  mage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="5" fill="currentColor" fill-opacity="0.22"/><path d="M12 14v7M8 18h8"/></svg>'
+  mage: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="9" r="5" fill="currentColor" fill-opacity="0.22"/><path d="M12 14v7M8 18h8"/></svg>',
+  juggernaut: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="8" rx="2" fill="currentColor" fill-opacity="0.24"/><path d="M12 12v9M9 21h6"/></svg>'
 };
 
 // Icone SVG nitide per le carte Level-Up e la barra build attiva
@@ -35,6 +43,7 @@ const UPGRADE_ICONS = {
   blades: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 8-3 3-3-3 3-8z"/><path d="M22 12l-8 3-3-3 3-3 8 3z"/><path d="M12 22l-3-8 3-3 3 3-3 8z"/><path d="M2 12l8-3 3 3-3 3-8-3z"/></svg>',
   dagger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l5-5m11-11l-9 5 4 4 5-9z" fill="currentColor" fill-opacity="0.25"/><path d="M7 13l4 4"/></svg>',
   orb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6" fill="currentColor" fill-opacity="0.28"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
+  hammer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="4" width="14" height="7" rx="1.5" fill="currentColor" fill-opacity="0.26"/><path d="M12 11v10"/></svg>',
   might: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/></svg>',
   swift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14c4 0 6-4 10-4h6l-3 5h-5l-4 4H4v-5z"/></svg>',
   area: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>',
@@ -103,6 +112,7 @@ const el = {
   hudTimer: document.getElementById('hud-timer'),
   hudKills: document.getElementById('hud-kills'),
   hudBuildStrip: document.getElementById('hud-build-strip'),
+  hudBuffBar: document.getElementById('hud-buff-bar'),
   pauseBtn: document.getElementById('pause-btn'),
 
   bossHud: document.getElementById('boss-hud'),
@@ -113,6 +123,21 @@ const el = {
 
   levelupModal: document.getElementById('levelup-modal'),
   levelupCards: document.getElementById('levelup-cards'),
+
+  chestModal: document.getElementById('chest-modal'),
+  chestRewardBox: document.getElementById('chest-reward-box'),
+  chestIcon: document.getElementById('chest-icon'),
+  chestTag: document.getElementById('chest-tag'),
+  chestTitle: document.getElementById('chest-title'),
+  chestDesc: document.getElementById('chest-desc'),
+  chestClaimBtn: document.getElementById('chest-claim-btn'),
+
+  codexBtn: document.getElementById('codex-btn'),
+  codexModal: document.getElementById('codex-modal'),
+  codexProgress: document.getElementById('codex-progress'),
+  codexTabs: document.getElementById('codex-tabs'),
+  codexList: document.getElementById('codex-list'),
+  codexCloseBtn: document.getElementById('codex-close-btn'),
 
   pauseModal: document.getElementById('pause-modal'),
   resumeBtn: document.getElementById('resume-btn'),
@@ -133,6 +158,7 @@ const el = {
   endMetaXpFill: document.getElementById('end-meta-xp-fill'),
   endMetaLevelUp: document.getElementById('end-meta-levelup'),
   endMetaUnlocks: document.getElementById('end-meta-unlocks'),
+  endCodexUnlocks: document.getElementById('end-codex-unlocks'),
   playAgainBtn: document.getElementById('play-again-btn'),
   endTitleBtn: document.getElementById('end-title-btn'),
 
@@ -343,8 +369,65 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  let activeCodexCategory = 'all';
+
+  const updateCodexButtonLabel = () => {
+    if (!el.codexBtn) return;
+    const view = getCodexView(loadCodexState(), 'all');
+    el.codexBtn.textContent = `Codex (${view.unlockedCount}/${view.totalCount})`;
+  };
+
+  const renderCodexModal = (category = activeCodexCategory) => {
+    activeCodexCategory = category;
+    const view = getCodexView(loadCodexState(), activeCodexCategory);
+
+    if (el.codexProgress) {
+      el.codexProgress.textContent = `${view.unlockedCount} / ${view.totalCount}`;
+    }
+
+    if (el.codexTabs) {
+      el.codexTabs.innerHTML = '';
+      CODEX_CATEGORIES.forEach((cat) => {
+        const tabBtn = document.createElement('button');
+        tabBtn.type = 'button';
+        tabBtn.className = `codex-tab${cat.id === activeCodexCategory ? ' is-active' : ''}`;
+        tabBtn.textContent = cat.label;
+        tabBtn.addEventListener('click', () => {
+          audio.playUiClick();
+          renderCodexModal(cat.id);
+        });
+        el.codexTabs.appendChild(tabBtn);
+      });
+    }
+
+    if (el.codexList) {
+      el.codexList.innerHTML = '';
+      view.entries.forEach((entry) => {
+        const card = document.createElement('article');
+        card.className = `codex-entry${entry.unlocked ? '' : ' is-locked'}`;
+        card.style.setProperty('--entry-accent', entry.accent || '#f59e0b');
+
+        if (entry.unlocked) {
+          card.innerHTML = `
+            <div class="codex-entry-title">${entry.title}</div>
+            <div class="codex-entry-meta">${entry.subtitle}</div>
+            <p class="codex-entry-body">${entry.body}</p>
+          `;
+        } else {
+          card.innerHTML = `
+            <div class="codex-entry-title">Runa Sigillata</div>
+            <div class="codex-entry-meta">Sblocco · ${entry.unlockHint}</div>
+            <p class="codex-entry-body">Continua a combattere a Midgard per decifrare questa incisione runica.</p>
+          `;
+        }
+        el.codexList.appendChild(card);
+      });
+    }
+  };
+
   renderHeroSelection();
   renderTitleRecords();
+  updateCodexButtonLabel();
   updateMuteButtons();
   setupPwaExperience();
 
@@ -375,12 +458,22 @@ window.addEventListener('DOMContentLoaded', async () => {
         el.hudBuildStrip.innerHTML = data.build
           .map(
             (item) => `
-            <div class="build-chip" title="${item.name}" style="border-color:${item.accent}44;color:${item.accent}">
+            <div class="build-chip${item.evolved ? ' is-evolved' : ''}" title="${item.name}" style="border-color:${item.accent}44;color:${item.accent}">
               <span class="build-chip-icon">${UPGRADE_ICONS[item.id] || ''}</span>
-              <span class="build-chip-lv">${item.level}</span>
+              <span class="build-chip-lv">${item.evolved ? '★' : item.level}</span>
             </div>`
           )
           .join('');
+      }
+      if (el.hudBuffBar) {
+        if (data.buff) {
+          el.hudBuffBar.classList.remove('hidden');
+          el.hudBuffBar.style.borderLeftColor = data.buff.accent || '#38bdf8';
+          el.hudBuffBar.style.color = data.buff.accent || '#e0f2fe';
+          el.hudBuffBar.textContent = `${data.buff.label} · ${Math.max(1, Math.ceil(data.buff.remaining))}s`;
+        } else {
+          el.hudBuffBar.classList.add('hidden');
+        }
       }
     },
 
@@ -411,15 +504,17 @@ window.addEventListener('DOMContentLoaded', async () => {
       choices.forEach((choice) => {
         const card = document.createElement('button');
         card.type = 'button';
-        card.className = 'upgrade-card';
-        const levelTag =
-          choice.currentLevel === 0
+        card.className = `upgrade-card${choice.isEvolution ? ' is-evolution' : ''}`;
+        const levelTag = choice.isEvolution
+          ? 'EVOLUZIONE ★'
+          : choice.currentLevel === 0
             ? 'NUOVO'
             : `LV ${choice.currentLevel} → LV ${choice.nextLevel}`;
 
+        const iconKey = choice.weaponId || choice.id;
         card.innerHTML = `
           <div class="upgrade-icon" style="color:${choice.accent};border-color:${choice.accent}55">
-            ${UPGRADE_ICONS[choice.id] || ''}
+            ${UPGRADE_ICONS[iconKey] || ''}
           </div>
           <div class="upgrade-body">
             <div class="upgrade-head">
@@ -440,6 +535,30 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       el.levelupModal.classList.remove('hidden');
       el.levelupModal.classList.add('flex');
+    },
+
+    onChestOpened(reward) {
+      if (!el.chestModal || !reward) {
+        gameScene.resumeGame();
+        return;
+      }
+      if (el.chestRewardBox) {
+        el.chestRewardBox.classList.toggle('is-evolution', Boolean(reward.isEvolution));
+        el.chestRewardBox.style.borderColor = reward.accent || '#fbbf24';
+      }
+      if (el.chestIcon) {
+        el.chestIcon.style.color = reward.accent || '#fbbf24';
+        el.chestIcon.innerHTML = UPGRADE_ICONS[reward.iconId] || UPGRADE_ICONS.might;
+      }
+      if (el.chestTag) {
+        el.chestTag.textContent = reward.tag || 'TESORO';
+        el.chestTag.style.color = reward.accent || '#fbbf24';
+      }
+      if (el.chestTitle) el.chestTitle.textContent = reward.title || 'Ricompensa';
+      if (el.chestDesc) el.chestDesc.textContent = reward.subtitle || '';
+
+      el.chestModal.classList.remove('hidden');
+      el.chestModal.classList.add('flex');
     },
 
     onPauseChanged(isPaused, build) {
@@ -468,11 +587,14 @@ window.addEventListener('DOMContentLoaded', async () => {
       const { isNewRecord } = saveRecords(result);
       const metaUpdate = grantHeroMetaXp(result.heroId || metaState.selectedHero, result);
       metaState = metaUpdate.meta;
+      const codexUpdate = recordRunCodexProgress(result);
       renderTitleRecords();
       renderHeroSelection();
+      updateCodexButtonLabel();
 
       if (el.gameHud) el.gameHud.classList.add('hidden');
       if (el.bossHud) el.bossHud.classList.add('hidden');
+      if (el.hudBuffBar) el.hudBuffBar.classList.add('hidden');
 
       if (el.endTitle) {
         el.endTitle.textContent = result.victory ? 'VITTORIA A MIDGARD' : 'CADUTO NELL’INVERNO';
@@ -530,6 +652,14 @@ window.addEventListener('DOMContentLoaded', async () => {
           el.endMetaUnlocks.classList.add('hidden');
         }
       }
+      if (el.endCodexUnlocks) {
+        if (codexUpdate.newlyUnlocked.length > 0) {
+          el.endCodexUnlocks.textContent = `Codex sbloccato: ${codexUpdate.newlyUnlocked.map((e) => e.title).join(' · ')}`;
+          el.endCodexUnlocks.classList.remove('hidden');
+        } else {
+          el.endCodexUnlocks.classList.add('hidden');
+        }
+      }
 
       if (el.endModal) {
         el.endModal.classList.remove('hidden');
@@ -577,6 +707,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.endModal?.classList.remove('flex');
     el.pauseModal?.classList.add('hidden');
     el.pauseModal?.classList.remove('flex');
+    el.chestModal?.classList.add('hidden');
+    el.chestModal?.classList.remove('flex');
+    el.codexModal?.classList.add('hidden');
+    el.codexModal?.classList.remove('flex');
+    el.hudBuffBar?.classList.add('hidden');
     el.gameHud?.classList.remove('hidden');
 
     await gameScene.startNewRun(buildRunConfig());
@@ -584,6 +719,27 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   el.playBtn?.addEventListener('click', startGameFlow);
   el.playAgainBtn?.addEventListener('click', startGameFlow);
+
+  el.codexBtn?.addEventListener('click', () => {
+    audio.unlock();
+    audio.playUiClick();
+    renderCodexModal('all');
+    el.codexModal?.classList.remove('hidden');
+    el.codexModal?.classList.add('flex');
+  });
+
+  el.codexCloseBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    el.codexModal?.classList.add('hidden');
+    el.codexModal?.classList.remove('flex');
+  });
+
+  el.chestClaimBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    el.chestModal?.classList.add('hidden');
+    el.chestModal?.classList.remove('flex');
+    gameScene.resumeGame();
+  });
 
   el.titleMuteBtn?.addEventListener('click', () => {
     audio.unlock();
@@ -618,13 +774,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.pauseModal?.classList.remove('flex');
     el.endModal?.classList.add('hidden');
     el.endModal?.classList.remove('flex');
+    el.chestModal?.classList.add('hidden');
+    el.chestModal?.classList.remove('flex');
     el.gameHud?.classList.add('hidden');
     el.bossHud?.classList.add('hidden');
+    el.hudBuffBar?.classList.add('hidden');
     el.titleScreen?.classList.remove('hidden');
     gameScene.gameState = 'IDLE';
     gameScene.physics.pause();
     renderHeroSelection();
     renderTitleRecords();
+    updateCodexButtonLabel();
   };
 
   el.quitBtn?.addEventListener('click', returnToTitle);

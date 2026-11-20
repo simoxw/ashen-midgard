@@ -253,64 +253,82 @@ export function generateHdTextures(textures) {
     ctx.fill();
   });
 
-  // 3. EROE 1: Astrid la Valchiria — Vettoriale 4x Super Dettagliata (144x168)
-  registerCanvas(textures, 'hero_warrior', 144, 168, (ctx) => {
+  // Helper animazione multi-frame 4x (registra <key> = frame 0 + <key>_f0.._f3)
+  const registerAnimated = (baseKey, w, h, drawFrameFn) => {
+    registerCanvas(textures, baseKey, w, h, (ctx) => drawFrameFn(ctx, 0));
+    for (let f = 0; f < 4; f++) {
+      registerCanvas(textures, `${baseKey}_f${f}`, w, h, (ctx) => drawFrameFn(ctx, f));
+    }
+  };
+
+  const getFrameKinematics = (frameIdx) => {
+    const stride = frameIdx === 1 ? 6.5 : frameIdx === 3 ? -6.5 : 0;
+    const bob = frameIdx === 1 || frameIdx === 3 ? -3.2 : frameIdx === 2 ? 1.4 : 0;
+    const sway = frameIdx === 1 ? 0.06 : frameIdx === 3 ? -0.06 : 0;
+    return { stride, bob, sway };
+  };
+
+  // 3. EROE 1: Astrid la Valchiria — Vettoriale 4x Multi-Frame (144x168)
+  registerAnimated('hero_warrior', 144, 168, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Mantello cremisi scolpito con pieghe profonde e bordo ricamato oro
+    // Mantello cremisi scolpito con ondeggio camminata e bordo oro
     const cloak = ctx.createLinearGradient(72, 50, 72, 152);
     cloak.addColorStop(0, '#b91c1c');
     cloak.addColorStop(0.45, '#7f1d1d');
     cloak.addColorStop(1, '#3b0712');
     ctx.fillStyle = cloak;
     ctx.beginPath();
-    ctx.moveTo(36, 56);
-    ctx.bezierCurveTo(18, 96, 16, 128, 22, 146);
-    ctx.quadraticCurveTo(72, 160, 120, 144);
-    ctx.bezierCurveTo(124, 122, 118, 92, 106, 56);
+    ctx.moveTo(36, 56 + bob);
+    ctx.bezierCurveTo(18 - stride * 0.5, 96 + bob, 16 + stride * 0.6, 128, 22 + stride * 0.8, 146);
+    ctx.quadraticCurveTo(72, 160 + bob * 0.4, 120 + stride * 0.8, 144);
+    ctx.bezierCurveTo(124 + stride * 0.4, 122, 118, 92 + bob, 106, 56 + bob);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Bordo oro e pieghe interne del mantello
     ctx.strokeStyle = 'rgba(251, 191, 36, 0.8)';
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.strokeStyle = 'rgba(24, 5, 8, 0.45)';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(46, 86);
-    ctx.quadraticCurveTo(40, 122, 42, 148);
-    ctx.moveTo(96, 86);
-    ctx.quadraticCurveTo(100, 120, 98, 146);
+    ctx.moveTo(46, 86 + bob);
+    ctx.quadraticCurveTo(40 + stride * 0.3, 122, 42 + stride * 0.5, 148);
+    ctx.moveTo(96, 86 + bob);
+    ctx.quadraticCurveTo(100 + stride * 0.3, 120, 98 + stride * 0.5, 146);
     ctx.stroke();
 
-    // Stivali corazzati con gambali in ferro e fibbie
-    const drawBoot = (bx) => {
-      const bg = ctx.createLinearGradient(bx, 112, bx + 22, 158);
+    // Stivali corazzati con passo alternato
+    const drawBoot = (bx, byOff) => {
+      const by = 112 + byOff;
+      const bg = ctx.createLinearGradient(bx, by, bx + 22, by + 46);
       bg.addColorStop(0, '#475569');
       bg.addColorStop(0.5, '#1e293b');
       bg.addColorStop(1, '#090d16');
       ctx.fillStyle = bg;
-      drawRoundedPath(ctx, bx, 112, 22, 44, 7);
+      drawRoundedPath(ctx, bx, by, 22, 44, 7);
       ctx.fill();
       ctx.strokeStyle = '#090d16';
       ctx.lineWidth = 2.6;
       ctx.stroke();
-      // Ginocchiera metallica
       ctx.fillStyle = '#94a3b8';
-      drawRoundedPath(ctx, bx + 2, 114, 18, 10, 4);
+      drawRoundedPath(ctx, bx + 2, by + 2, 18, 10, 4);
       ctx.fill();
       ctx.fillStyle = '#d97706';
-      ctx.fillRect(bx + 2, 134, 18, 4);
+      ctx.fillRect(bx + 2, by + 22, 18, 4);
     };
-    drawBoot(42);
-    drawBoot(78);
+    drawBoot(42 - stride * 0.45, -stride * 0.8);
+    drawBoot(78 + stride * 0.45, stride * 0.8);
 
-    // Corazza in acciaio temperato con riflesso verticale e stemma norreno
+    ctx.save();
+    ctx.translate(0, bob);
+
+    // Corazza in acciaio temperato
     const armor = ctx.createLinearGradient(38, 56, 106, 120);
     armor.addColorStop(0, '#cbd5e1');
     armor.addColorStop(0.32, '#64748b');
@@ -326,7 +344,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    // Rim light sul pettorale + intarsio V oro
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 2.6;
     ctx.beginPath();
@@ -336,7 +353,6 @@ export function generateHdTextures(textures) {
     ctx.stroke();
     drawRivets(ctx, [[48, 66], [94, 66], [48, 94], [94, 94]], 2.1);
 
-    // Scarsella & Cintura runica borchiata
     const belt = ctx.createLinearGradient(39, 98, 103, 110);
     belt.addColorStop(0, '#78350f');
     belt.addColorStop(0.5, '#f59e0b');
@@ -348,7 +364,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.4;
     ctx.stroke();
 
-    // Fibbia runica centrale
     ctx.fillStyle = '#fef3c7';
     drawRoundedPath(ctx, 63, 96, 16, 17, 4);
     ctx.fill();
@@ -356,11 +371,10 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Spallacci con pelliccia nordica e borchie dorate
     const drawPauldron = (px, dir) => {
       ctx.save();
       ctx.translate(px, 63);
-      ctx.rotate(dir * 0.24);
+      ctx.rotate(dir * 0.24 + sway * 0.5);
       ctx.fillStyle = '#e2e8f0';
       ctx.beginPath();
       ctx.ellipse(0, 0, 18, 11, 0, 0, Math.PI * 2);
@@ -368,8 +382,6 @@ export function generateHdTextures(textures) {
       ctx.strokeStyle = '#090d16';
       ctx.lineWidth = 2.6;
       ctx.stroke();
-
-      // Placchetta ferro + umbone oro
       const pg = ctx.createLinearGradient(-12, -8, 12, 8);
       pg.addColorStop(0, '#94a3b8');
       pg.addColorStop(1, '#334155');
@@ -386,20 +398,18 @@ export function generateHdTextures(textures) {
     drawPauldron(40, -1);
     drawPauldron(102, 1);
 
-    // Trecce biondo oro dietro il viso
     const hair = ctx.createLinearGradient(44, 34, 98, 76);
     hair.addColorStop(0, '#fbbf24');
     hair.addColorStop(1, '#b45309');
     ctx.fillStyle = hair;
     ctx.beginPath();
-    ctx.ellipse(46, 54, 7.5, 21, 0.22, 0, Math.PI * 2);
-    ctx.ellipse(98, 54, 7.5, 21, -0.22, 0, Math.PI * 2);
+    ctx.ellipse(46, 54, 7.5, 21, 0.22 + sway * 0.4, 0, Math.PI * 2);
+    ctx.ellipse(98, 54, 7.5, 21, -0.22 + sway * 0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#78350f';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Volto scolpito
     const skin = ctx.createLinearGradient(56, 30, 88, 62);
     skin.addColorStop(0, '#fde68a');
     skin.addColorStop(1, '#d97706');
@@ -411,11 +421,9 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.2;
     ctx.stroke();
 
-    // Occhi azzurri luminosi
     drawGlowEye(ctx, 64, 47, 2.8, '#f0f9ff', 'rgba(56, 189, 248, 0.85)');
     drawGlowEye(ctx, 80, 47, 2.8, '#f0f9ff', 'rgba(56, 189, 248, 0.85)');
 
-    // Elmo Alato da Valchiria con cresta oro e nasale
     const helm = ctx.createLinearGradient(48, 16, 94, 44);
     helm.addColorStop(0, '#f1f5f9');
     helm.addColorStop(0.55, '#64748b');
@@ -434,14 +442,12 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.8;
     ctx.stroke();
 
-    // Bordo corona elmo oro
     ctx.strokeStyle = '#fbbf24';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(72, 36, 19.5, Math.PI * 1.06, -Math.PI * 0.06);
     ctx.stroke();
 
-    // Ali scolpite d'argento
     const drawWing = (wx, dir) => {
       const wg = ctx.createLinearGradient(wx, 34, wx + dir * 24, 6);
       wg.addColorStop(0, '#cbd5e1');
@@ -460,7 +466,11 @@ export function generateHdTextures(textures) {
     drawWing(50, -1);
     drawWing(94, 1);
 
-    // Ascia Runica nella mano destra con lama incisa
+    // Ascia Runica oscillante col passo
+    ctx.save();
+    ctx.translate(116, 86);
+    ctx.rotate(sway * 1.4);
+    ctx.translate(-116, -86);
     ctx.strokeStyle = '#451a03';
     ctx.lineWidth = 8.5;
     ctx.beginPath();
@@ -487,34 +497,36 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.4;
     ctx.stroke();
 
-    // Filo luminoso + Runa incisa sulla lama
     ctx.strokeStyle = '#fef3c7';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(136, 34);
     ctx.quadraticCurveTo(140, 48, 134, 62);
     ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
   });
 
-  // 4. EROE 2: Skadi l'Assassina d'Ombra — Vettoriale 4x Super Dettagliata (144x168)
-  registerCanvas(textures, 'hero_assassin', 144, 168, (ctx) => {
+  // 4. EROE 2: Skadi l'Assassina d'Ombra — Vettoriale 4x Multi-Frame (144x168)
+  registerAnimated('hero_assassin', 144, 168, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Mantello ombra violaceo multi-punta
     const cloak = ctx.createLinearGradient(72, 46, 72, 158);
     cloak.addColorStop(0, '#6b21a8');
     cloak.addColorStop(0.55, '#2e1065');
     cloak.addColorStop(1, '#090d16');
     ctx.fillStyle = cloak;
     ctx.beginPath();
-    ctx.moveTo(40, 54);
-    ctx.quadraticCurveTo(16, 102, 18, 150);
-    ctx.lineTo(44, 136);
-    ctx.lineTo(72, 156);
-    ctx.lineTo(100, 136);
-    ctx.lineTo(126, 150);
-    ctx.quadraticCurveTo(124, 102, 102, 54);
+    ctx.moveTo(40, 54 + bob);
+    ctx.quadraticCurveTo(16 - stride * 0.4, 102 + bob, 18 + stride, 150);
+    ctx.lineTo(44 + stride * 0.6, 136);
+    ctx.lineTo(72 + stride * 0.4, 156);
+    ctx.lineTo(100 + stride * 0.6, 136);
+    ctx.lineTo(126 + stride, 150);
+    ctx.quadraticCurveTo(124 + stride * 0.4, 102 + bob, 102, 54 + bob);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#090d16';
@@ -524,10 +536,10 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    // Stivali agili con fasce di cuoio
-    const drawBoot = (bx) => {
+    const drawBoot = (bx, byOff) => {
+      const by = 108 + byOff;
       ctx.fillStyle = '#0f172a';
-      drawRoundedPath(ctx, bx, 108, 18, 48, 6);
+      drawRoundedPath(ctx, bx, by, 18, 48, 6);
       ctx.fill();
       ctx.strokeStyle = '#090d16';
       ctx.lineWidth = 2.4;
@@ -535,16 +547,18 @@ export function generateHdTextures(textures) {
       ctx.strokeStyle = '#a855f7';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(bx + 2, 122);
-      ctx.lineTo(bx + 16, 126);
-      ctx.moveTo(bx + 2, 132);
-      ctx.lineTo(bx + 16, 136);
+      ctx.moveTo(bx + 2, by + 14);
+      ctx.lineTo(bx + 16, by + 18);
+      ctx.moveTo(bx + 2, by + 24);
+      ctx.lineTo(bx + 16, by + 28);
       ctx.stroke();
     };
-    drawBoot(46);
-    drawBoot(78);
+    drawBoot(46 - stride * 0.5, -stride * 0.85);
+    drawBoot(78 + stride * 0.5, stride * 0.85);
 
-    // Corpetto in pelle d'ossidiana + bandoliera diagonale con coltelli
+    ctx.save();
+    ctx.translate(0, bob);
+
     const leather = ctx.createLinearGradient(44, 56, 100, 116);
     leather.addColorStop(0, '#312e81');
     leather.addColorStop(0.6, '#1e1b4b');
@@ -556,7 +570,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.8;
     ctx.stroke();
 
-    // Bandoliera diagonale in cuoio & pugnali da lancio
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 6;
     ctx.beginPath();
@@ -565,7 +578,6 @@ export function generateHdTextures(textures) {
     ctx.stroke();
     drawRivets(ctx, [[58, 71], [72, 82], [85, 92]], 2, '#e879f9');
 
-    // Sciarpa / Fascia runica magenta svolazzante
     const sash = ctx.createLinearGradient(44, 94, 100, 134);
     sash.addColorStop(0, '#f0abfc');
     sash.addColorStop(0.5, '#d946ef');
@@ -575,21 +587,19 @@ export function generateHdTextures(textures) {
     ctx.fill();
     ctx.beginPath();
     ctx.moveTo(85, 99);
-    ctx.lineTo(104, 134);
-    ctx.lineTo(88, 128);
+    ctx.lineTo(104 + stride * 0.8, 134);
+    ctx.lineTo(88 + stride * 0.5, 128);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Volto + Maschera + Occhi violetti brillanti
     ctx.fillStyle = '#fbcfe8';
     ctx.beginPath();
     ctx.ellipse(72, 43, 17, 18.5, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Maschera inferiore
     ctx.fillStyle = '#1e1b4b';
     ctx.beginPath();
     ctx.moveTo(54, 44);
@@ -605,7 +615,6 @@ export function generateHdTextures(textures) {
     drawGlowEye(ctx, 64, 40, 2.8, '#fdf4ff', 'rgba(232, 121, 249, 0.92)');
     drawGlowEye(ctx, 80, 40, 2.8, '#fdf4ff', 'rgba(232, 121, 249, 0.92)');
 
-    // Cappuccio appuntito con cuciture e rim magenta
     const hood = ctx.createLinearGradient(44, 8, 98, 46);
     hood.addColorStop(0, '#9333ea');
     hood.addColorStop(1, '#2e1065');
@@ -624,8 +633,11 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 1.6;
     ctx.stroke();
 
-    // Doppi Pugnali d'Ombra ricurvi con filo brillante
-    const drawDagger = (hx, hy, tx, ty, cx, cy) => {
+    const drawDagger = (hx, hy, tx, ty, cx, cy, rot) => {
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(rot);
+      ctx.translate(-hx, -hy);
       const dg = ctx.createLinearGradient(hx, hy, tx, ty);
       dg.addColorStop(0, '#701a75');
       dg.addColorStop(0.55, '#e879f9');
@@ -640,27 +652,30 @@ export function generateHdTextures(textures) {
       ctx.strokeStyle = '#090d16';
       ctx.lineWidth = 2;
       ctx.stroke();
+      ctx.restore();
     };
-    drawDagger(38, 88, 7, 62, 18, 80);
-    drawDagger(106, 88, 137, 62, 126, 80);
+    drawDagger(38, 88, 7, 62, 18, 80, -sway * 1.8);
+    drawDagger(106, 88, 137, 62, 126, 80, sway * 1.8);
+
+    ctx.restore();
   });
 
-  // 5. EROE 3: Freya la Maga delle Rune — Vettoriale 4x Super Dettagliata (144x168)
-  registerCanvas(textures, 'hero_mage', 144, 168, (ctx) => {
+  // 5. EROE 3: Freya la Maga delle Rune — Vettoriale 4x Multi-Frame (144x168)
+  registerAnimated('hero_mage', 144, 168, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Veste astrale lunga con bordo ghiaccio luminoso
     const robe = ctx.createLinearGradient(72, 56, 72, 158);
     robe.addColorStop(0, '#0284c7');
     robe.addColorStop(0.5, '#0c4a6e');
     robe.addColorStop(1, '#082f49');
     ctx.fillStyle = robe;
     ctx.beginPath();
-    ctx.moveTo(45, 58);
-    ctx.bezierCurveTo(30, 102, 28, 132, 28, 152);
-    ctx.quadraticCurveTo(72, 163, 116, 152);
-    ctx.bezierCurveTo(116, 132, 114, 102, 99, 58);
+    ctx.moveTo(45, 58 + bob);
+    ctx.bezierCurveTo(30 - stride * 0.4, 102 + bob, 28 + stride * 0.5, 132, 28 + stride * 0.7, 152);
+    ctx.quadraticCurveTo(72, 163 + bob * 0.3, 116 + stride * 0.7, 152);
+    ctx.bezierCurveTo(116 + stride * 0.3, 132, 114, 102 + bob, 99, 58 + bob);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#090d16';
@@ -670,30 +685,30 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Stola centrale dorata con simbolo runico inciso
+    ctx.save();
+    ctx.translate(0, bob);
+
     const stole = ctx.createLinearGradient(62, 62, 82, 154);
     stole.addColorStop(0, '#fde68a');
     stole.addColorStop(0.45, '#f59e0b');
     stole.addColorStop(1, '#92400e');
     ctx.fillStyle = stole;
-    drawRoundedPath(ctx, 62, 64, 20, 88, 5);
+    drawRoundedPath(ctx, 62 + stride * 0.2, 64, 20, 88, 5);
     ctx.fill();
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 2.2;
     ctx.stroke();
 
-    // Runa sulla stola
     ctx.strokeStyle = '#0c4a6e';
     ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(72, 92);
-    ctx.lineTo(72, 126);
-    ctx.moveTo(65, 102);
-    ctx.lineTo(79, 112);
-    ctx.lineTo(65, 120);
+    ctx.moveTo(72 + stride * 0.2, 92);
+    ctx.lineTo(72 + stride * 0.2, 126);
+    ctx.moveTo(65 + stride * 0.2, 102);
+    ctx.lineTo(79 + stride * 0.2, 112);
+    ctx.lineTo(65 + stride * 0.2, 120);
     ctx.stroke();
 
-    // Mantellina arcana sulle spalle
     const mantle = ctx.createLinearGradient(32, 56, 112, 80);
     mantle.addColorStop(0, '#0ea5e9');
     mantle.addColorStop(1, '#0369a1');
@@ -707,20 +722,18 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Chioma argentea fluente con ciocche
     const hair = ctx.createLinearGradient(42, 20, 102, 88);
     hair.addColorStop(0, '#ffffff');
     hair.addColorStop(0.55, '#cbd5e1');
     hair.addColorStop(1, '#64748b');
     ctx.fillStyle = hair;
     ctx.beginPath();
-    ctx.ellipse(72, 48, 27, 32, 0, 0, Math.PI * 2);
+    ctx.ellipse(72, 48, 27, 32, sway * 0.35, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#334155';
     ctx.lineWidth = 2.4;
     ctx.stroke();
 
-    // Volto
     ctx.fillStyle = '#fde68a';
     ctx.beginPath();
     ctx.ellipse(72, 44, 17, 18.5, 0, 0, Math.PI * 2);
@@ -732,7 +745,6 @@ export function generateHdTextures(textures) {
     drawGlowEye(ctx, 64, 44, 2.8, '#f0f9ff', 'rgba(56, 189, 248, 0.95)');
     drawGlowEye(ctx, 80, 44, 2.8, '#f0f9ff', 'rgba(56, 189, 248, 0.95)');
 
-    // Diadema d'oro con gemma del gelo
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 4.5;
     ctx.beginPath();
@@ -740,7 +752,11 @@ export function generateHdTextures(textures) {
     ctx.stroke();
     drawGlowEye(ctx, 72, 23, 4.2, '#ffffff', 'rgba(56, 189, 248, 0.98)');
 
-    // Bastone runico + cristallo sfaccettato levitante + doppio anello dorato
+    // Bastone runico + cristallo oscillante
+    ctx.save();
+    ctx.translate(118, 95);
+    ctx.rotate(sway * 0.9);
+    ctx.translate(-118, -95);
     ctx.strokeStyle = '#451a03';
     ctx.lineWidth = 8;
     ctx.beginPath();
@@ -760,7 +776,6 @@ export function generateHdTextures(textures) {
     ctx.arc(118, 28, 25, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cristallo centrale sfaccettato
     ctx.fillStyle = '#e0f2fe';
     ctx.beginPath();
     ctx.moveTo(118, 14);
@@ -776,23 +791,214 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#fbbf24';
     ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.ellipse(118, 28, 17, 6.5, -0.45, 0, Math.PI * 2);
+    ctx.ellipse(118, 28, 17, 6.5, -0.45 + sway, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
   });
 
-  // 6. NEMICO SWARM: Draugr del Gelo — Vettoriale 4x (120x136)
-  registerCanvas(textures, 'enemy_swarm', 120, 136, (ctx) => {
+  // 5b. EROE 4: Bjorn Martello di Ferro — Vettoriale 4x Multi-Frame (144x168)
+  registerAnimated('hero_juggernaut', 144, 168, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Stivali logori
-    ctx.fillStyle = '#0f172a';
-    drawRoundedPath(ctx, 36, 94, 16, 34, 5);
+    // Mantello pesante di pelliccia d'orso bruna dietro le spalle
+    const furCloak = ctx.createLinearGradient(72, 48, 72, 150);
+    furCloak.addColorStop(0, '#78350f');
+    furCloak.addColorStop(0.6, '#451a03');
+    furCloak.addColorStop(1, '#1c1917');
+    ctx.fillStyle = furCloak;
+    ctx.beginPath();
+    ctx.moveTo(30, 56 + bob);
+    ctx.bezierCurveTo(16 - stride * 0.4, 98 + bob, 16 + stride * 0.5, 134, 24 + stride * 0.6, 148);
+    ctx.quadraticCurveTo(72, 158, 118 + stride * 0.6, 146);
+    ctx.bezierCurveTo(124 + stride * 0.3, 128, 120, 96 + bob, 112, 56 + bob);
+    ctx.closePath();
     ctx.fill();
-    drawRoundedPath(ctx, 68, 94, 16, 34, 5);
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Stivali pesanti in ferro scuro
+    const drawHeavyBoot = (bx, byOff) => {
+      const by = 110 + byOff;
+      ctx.fillStyle = '#1e293b';
+      drawRoundedPath(ctx, bx, by, 25, 45, 7);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.8;
+      ctx.stroke();
+      ctx.fillStyle = '#fb923c';
+      ctx.fillRect(bx + 3, by + 16, 19, 5);
+    };
+    drawHeavyBoot(38 - stride * 0.4, -stride * 0.75);
+    drawHeavyBoot(79 + stride * 0.4, stride * 0.75);
+
+    ctx.save();
+    ctx.translate(0, bob);
+
+    // Corazza massiccia in ferro nero e bordature rame/ambra
+    const chest = ctx.createLinearGradient(34, 54, 110, 118);
+    chest.addColorStop(0, '#475569');
+    chest.addColorStop(0.55, '#1e293b');
+    chest.addColorStop(1, '#0f172a');
+    ctx.fillStyle = chest;
+    drawRoundedPath(ctx, 35, 56, 72, 60, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Runa della forgia sul pettorale
+    ctx.strokeStyle = '#fdba74';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.moveTo(71, 66);
+    ctx.lineTo(71, 96);
+    ctx.moveTo(59, 75);
+    ctx.lineTo(83, 87);
+    ctx.moveTo(83, 75);
+    ctx.lineTo(59, 87);
+    ctx.stroke();
+    drawRivets(ctx, [[43, 65], [99, 65], [43, 99], [99, 99]], 2.2, '#fb923c');
+
+    // Cintura di forgia
+    ctx.fillStyle = '#9a3412';
+    drawRoundedPath(ctx, 36, 100, 70, 12, 4);
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    drawRoundedPath(ctx, 62, 98, 18, 15, 4);
     ctx.fill();
 
-    // Torso con maglia di ferro ossidata e piastre glaciali
+    // Spallacci con pelliccia chiara + borchie rame
+    for (const [px, dir] of [[34, -1], [108, 1]]) {
+      ctx.save();
+      ctx.translate(px, 62);
+      ctx.rotate(dir * 0.2 + sway * 0.4);
+      ctx.fillStyle = '#57534e';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 20, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      ctx.fillStyle = '#ea580c';
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Volto + folta barba rossiccia intrecciata
+    ctx.fillStyle = '#fdba74';
+    ctx.beginPath();
+    ctx.ellipse(71, 43, 18, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#7c2d12';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const beard = ctx.createLinearGradient(54, 48, 88, 72);
+    beard.addColorStop(0, '#c2410c');
+    beard.addColorStop(1, '#7c2d12');
+    ctx.fillStyle = beard;
+    ctx.beginPath();
+    ctx.moveTo(54, 46);
+    ctx.quadraticCurveTo(71, 78, 88, 46);
+    ctx.quadraticCurveTo(71, 56, 54, 46);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#431407';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    drawGlowEye(ctx, 64, 41, 2.7, '#fff7ed', 'rgba(251, 146, 60, 0.92)');
+    drawGlowEye(ctx, 78, 41, 2.7, '#fff7ed', 'rgba(251, 146, 60, 0.92)');
+
+    // Elmo cornuto da Fabbro-Guerriero
+    ctx.fillStyle = '#334155';
+    ctx.beginPath();
+    ctx.arc(71, 33, 20, Math.PI, 0);
+    ctx.lineTo(91, 38);
+    ctx.lineTo(74, 34);
+    ctx.lineTo(71, 41);
+    ctx.lineTo(68, 34);
+    ctx.lineTo(51, 38);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    for (const [hx, dir] of [[50, -1], [92, 1]]) {
+      ctx.fillStyle = '#fef3c7';
+      ctx.beginPath();
+      ctx.moveTo(hx, 30);
+      ctx.quadraticCurveTo(hx + dir * 20, 20, hx + dir * 16, 7);
+      ctx.quadraticCurveTo(hx + dir * 7, 17, hx - dir * 3, 24);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Martello Sismico massiccio nella mano destra
+    ctx.save();
+    ctx.translate(120, 82);
+    ctx.rotate(sway * 1.5);
+    ctx.translate(-120, -82);
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 8.5;
+    ctx.beginPath();
+    ctx.moveTo(120, 34);
+    ctx.lineTo(120, 128);
+    ctx.stroke();
+
+    const hammerHead = ctx.createLinearGradient(102, 20, 141, 52);
+    hammerHead.addColorStop(0, '#94a3b8');
+    hammerHead.addColorStop(0.5, '#334155');
+    hammerHead.addColorStop(1, '#0f172a');
+    ctx.fillStyle = hammerHead;
+    drawRoundedPath(ctx, 102, 22, 38, 26, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(114, 28);
+    ctx.lineTo(128, 28);
+    ctx.moveTo(121, 28);
+    ctx.lineTo(121, 42);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  });
+
+  // 6. NEMICO SWARM: Draugr del Gelo — Vettoriale 4x Multi-Frame (120x136)
+  registerAnimated('enemy_swarm', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 36 - stride * 0.4, 94 - stride * 0.7, 16, 34, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 68 + stride * 0.4, 94 + stride * 0.7, 16, 34, 5);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob);
+
     const body = ctx.createLinearGradient(32, 46, 88, 98);
     body.addColorStop(0, '#256073');
     body.addColorStop(0.55, '#133140');
@@ -807,7 +1013,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    // Costole & rune spettrali
     ctx.strokeStyle = 'rgba(125, 211, 252, 0.45)';
     ctx.lineWidth = 2.4;
     ctx.beginPath();
@@ -817,7 +1022,6 @@ export function generateHdTextures(textures) {
     ctx.lineTo(74, 76);
     ctx.stroke();
 
-    // Teschio / Viso cadaverico + Elmo cornuto
     ctx.fillStyle = '#475569';
     ctx.beginPath();
     ctx.ellipse(60, 32, 17, 17, 0, 0, Math.PI * 2);
@@ -826,7 +1030,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.6;
     ctx.stroke();
 
-    // Corna curve sull'elmo
     const drawHorn = (hx, dir) => {
       ctx.fillStyle = '#e2e8f0';
       ctx.beginPath();
@@ -853,7 +1056,10 @@ export function generateHdTextures(textures) {
     drawGlowEye(ctx, 53, 34, 2.8, '#e0f2fe', 'rgba(56, 189, 248, 0.96)');
     drawGlowEye(ctx, 67, 34, 2.8, '#e0f2fe', 'rgba(56, 189, 248, 0.96)');
 
-    // Spada antica scheggiata con guardia in ferro
+    ctx.save();
+    ctx.translate(90, 72);
+    ctx.rotate(sway * 1.4);
+    ctx.translate(-90, -72);
     const sw = ctx.createLinearGradient(90, 28, 108, 72);
     sw.addColorStop(0, '#f8fafc');
     sw.addColorStop(0.6, '#94a3b8');
@@ -867,37 +1073,42 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = sw;
     ctx.lineWidth = 5;
     ctx.stroke();
-    // Guardia trasversale
     ctx.strokeStyle = '#64748b';
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(82, 68);
     ctx.lineTo(98, 74);
     ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
   });
 
-  // 7. NEMICO VELOCE: Lupo Fenrir d'Ombra — Vettoriale 4x (144x112)
-  registerCanvas(textures, 'enemy_fast', 144, 112, (ctx) => {
+  // 7. NEMICO VELOCE: Lupo Fenrir d'Ombra — Vettoriale 4x Multi-Frame (144x112)
+  registerAnimated('enemy_fast', 144, 112, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Coda folta di fumo violaceo
     const tail = ctx.createLinearGradient(4, 44, 34, 66);
     tail.addColorStop(0, '#818cf8');
     tail.addColorStop(1, '#1e1b4b');
     ctx.fillStyle = tail;
     ctx.beginPath();
-    ctx.moveTo(30, 56);
-    ctx.quadraticCurveTo(5, 34, 8, 59);
-    ctx.quadraticCurveTo(18, 70, 35, 62);
+    ctx.moveTo(30, 56 + bob);
+    ctx.quadraticCurveTo(5, 34 + stride * 0.7, 8, 59 + stride * 0.4);
+    ctx.quadraticCurveTo(18, 70, 35, 62 + bob);
     ctx.closePath();
     ctx.fill();
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 2.4;
     ctx.stroke();
 
-    // Zampe muscolose in corsa + artigli
-    const legs = [[32, 72, 14, 32], [53, 74, 13, 30], [86, 72, 14, 32]];
+    const legs = [
+      [32 - stride * 0.8, 72 - stride * 0.3, 14, 32],
+      [53 + stride * 0.5, 74 + stride * 0.25, 13, 30],
+      [86 + stride * 0.9, 72 - stride * 0.35, 14, 32]
+    ];
     for (const [lx, ly, lw, lh] of legs) {
       ctx.fillStyle = '#1e1b4b';
       drawRoundedPath(ctx, lx, ly, lw, lh, 5);
@@ -909,20 +1120,21 @@ export function generateHdTextures(textures) {
       ctx.fillRect(lx + 4, ly + lh - 4, 7, 3);
     }
 
-    // Corpo slanciato da predatore
+    ctx.save();
+    ctx.translate(0, bob * 0.8);
+
     const fur = ctx.createLinearGradient(26, 34, 112, 80);
     fur.addColorStop(0, '#4f46e5');
     fur.addColorStop(0.55, '#312e81');
     fur.addColorStop(1, '#141136');
     ctx.fillStyle = fur;
     ctx.beginPath();
-    ctx.ellipse(67, 58, 39, 20, -0.06, 0, Math.PI * 2);
+    ctx.ellipse(67, 58, 39, 20, -0.06 + sway * 0.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Criniera arcana lungo la schiena
     ctx.fillStyle = '#a5b4fc';
     ctx.beginPath();
     ctx.moveTo(36, 42);
@@ -937,7 +1149,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Testa lupina + fauci + zanne + occhio cremisi
     ctx.fillStyle = '#3730a3';
     ctx.beginPath();
     ctx.moveTo(85, 34);
@@ -961,21 +1172,24 @@ export function generateHdTextures(textures) {
     ctx.fill();
 
     drawGlowEye(ctx, 110, 37, 3.2, '#fecdd3', 'rgba(244, 63, 94, 0.98)');
+    ctx.restore();
   });
 
-  // 8. NEMICO TANK: Jotun Corazzato — Vettoriale 4x (168x192)
-  registerCanvas(textures, 'enemy_tank', 168, 192, (ctx) => {
+  // 8. NEMICO TANK: Jotun Corazzato — Vettoriale 4x Multi-Frame (168x192)
+  registerAnimated('enemy_tank', 168, 192, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Stivali colossali
     ctx.fillStyle = '#0f172a';
-    drawRoundedPath(ctx, 42, 138, 30, 44, 8);
+    drawRoundedPath(ctx, 42, 138 - stride * 0.65, 30, 44, 8);
     ctx.fill();
-    drawRoundedPath(ctx, 96, 138, 30, 44, 8);
+    drawRoundedPath(ctx, 96, 138 + stride * 0.65, 30, 44, 8);
     ctx.fill();
 
-    // Corazza massiccia in ferro nero e basalto
+    ctx.save();
+    ctx.translate(0, bob * 0.9);
+
     const armor = ctx.createLinearGradient(30, 50, 138, 150);
     armor.addColorStop(0, '#64748b');
     armor.addColorStop(0.5, '#334155');
@@ -992,11 +1206,10 @@ export function generateHdTextures(textures) {
 
     drawRivets(ctx, [[45, 68], [123, 68], [45, 132], [123, 132]], 2.5, '#cbd5e1');
 
-    // Enormi spallacci borchiati + punte
     for (const [sx, rot] of [[32, -0.22], [136, 0.22]]) {
       ctx.save();
       ctx.translate(sx, 69);
-      ctx.rotate(rot);
+      ctx.rotate(rot + sway * 0.4);
       ctx.fillStyle = '#475569';
       ctx.beginPath();
       ctx.ellipse(0, 0, 24, 18, 0, 0, Math.PI * 2);
@@ -1010,7 +1223,6 @@ export function generateHdTextures(textures) {
       ctx.restore();
     }
 
-    // Elmo pesante + occhi cremisi minacciosi
     ctx.fillStyle = '#334155';
     drawRoundedPath(ctx, 54, 18, 60, 44, 13);
     ctx.fill();
@@ -1020,12 +1232,11 @@ export function generateHdTextures(textures) {
     drawGlowEye(ctx, 72, 40, 3.6, '#fee2e2', 'rgba(239, 68, 68, 0.96)');
     drawGlowEye(ctx, 96, 40, 3.6, '#fee2e2', 'rgba(239, 68, 68, 0.96)');
 
-    // Grande scudo runico borchiato a sinistra
     const shield = ctx.createLinearGradient(6, 58, 50, 132);
     shield.addColorStop(0, '#94a3b8');
     shield.addColorStop(1, '#1e293b');
     ctx.fillStyle = shield;
-    drawRoundedPath(ctx, 8, 61, 38, 70, 10);
+    drawRoundedPath(ctx, 8, 61 - stride * 0.25, 38, 70, 10);
     ctx.fill();
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 3;
@@ -1035,10 +1246,13 @@ export function generateHdTextures(textures) {
     ctx.stroke();
     ctx.fillStyle = '#e2e8f0';
     ctx.beginPath();
-    ctx.arc(27, 96, 7, 0, Math.PI * 2);
+    ctx.arc(27, 96 - stride * 0.25, 7, 0, Math.PI * 2);
     ctx.fill();
 
-    // Ascia pesante a destra
+    ctx.save();
+    ctx.translate(141, 76);
+    ctx.rotate(sway * 1.2);
+    ctx.translate(-141, -76);
     ctx.fillStyle = '#e2e8f0';
     ctx.beginPath();
     ctx.moveTo(141, 48);
@@ -1049,14 +1263,282 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 2.6;
     ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
   });
 
-  // 9. BOSS FINALE: Hrimthurs, Signore del Gelo — Vettoriale 4x Colosso (280x320)
-  registerCanvas(textures, 'boss', 280, 320, (ctx) => {
+  // 8b. NEMICO TIRATORE: Arciere di Brina — Vettoriale 4x Multi-Frame (120x136)
+  registerAnimated('enemy_archer', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Alone gelido attorno al colosso
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 38 - stride * 0.4, 94 - stride * 0.65, 14, 34, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 68 + stride * 0.4, 94 + stride * 0.65, 14, 34, 5);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob);
+
+    // Mantello glaciale ciano scuro
+    const cloak = ctx.createLinearGradient(34, 42, 86, 114);
+    cloak.addColorStop(0, '#0369a1');
+    cloak.addColorStop(0.6, '#0c4a6e');
+    cloak.addColorStop(1, '#082f49');
+    ctx.fillStyle = cloak;
+    ctx.beginPath();
+    ctx.moveTo(38, 44);
+    ctx.lineTo(24, 112);
+    ctx.quadraticCurveTo(60, 120, 96, 112);
+    ctx.lineTo(82, 44);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+
+    // Cappuccio acuminato
+    ctx.fillStyle = '#075985';
+    ctx.beginPath();
+    ctx.moveTo(38, 42);
+    ctx.quadraticCurveTo(42, 12, 60, 8);
+    ctx.quadraticCurveTo(78, 12, 82, 42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+
+    drawGlowEye(ctx, 53, 31, 2.7, '#ffffff', 'rgba(56, 189, 248, 0.98)');
+    drawGlowEye(ctx, 67, 31, 2.7, '#ffffff', 'rgba(56, 189, 248, 0.98)');
+
+    // Arco di ghiaccio + freccia incoccata
+    ctx.save();
+    ctx.translate(92, 66);
+    ctx.rotate(sway * 0.8);
+    ctx.translate(-92, -66);
+    ctx.strokeStyle = '#bae6fd';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(84, 66, 26, -Math.PI * 0.45, Math.PI * 0.45);
+    ctx.stroke();
+    ctx.strokeStyle = '#e0f2fe';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(86, 41);
+    ctx.lineTo(86, 91);
+    ctx.stroke();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(80, 66);
+    ctx.lineTo(114, 66);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  });
+
+  // 8c. NEMICO CARICA: Predone Berserker — Vettoriale 4x Multi-Frame (144x160)
+  registerAnimated('enemy_berserker', 144, 160, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    ctx.fillStyle = '#1c1917';
+    drawRoundedPath(ctx, 40 - stride * 0.5, 110 - stride * 0.85, 21, 40, 6);
+    ctx.fill();
+    drawRoundedPath(ctx, 82 + stride * 0.5, 110 + stride * 0.85, 21, 40, 6);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob);
+
+    // Torso muscoloso con pitture di guerra cremisi e cintura teschi
+    const torso = ctx.createLinearGradient(36, 52, 108, 120);
+    torso.addColorStop(0, '#991b1b');
+    torso.addColorStop(0.55, '#450a0a');
+    torso.addColorStop(1, '#1c1917');
+    ctx.fillStyle = torso;
+    drawRoundedPath(ctx, 36, 54, 72, 64, 15);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.strokeStyle = '#f87171';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // Pitture runiche rosse
+    ctx.strokeStyle = '#fca5a5';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(52, 64);
+    ctx.lineTo(72, 96);
+    ctx.moveTo(92, 64);
+    ctx.lineTo(72, 96);
+    ctx.stroke();
+
+    // Spallacci spinati
+    for (const [sx, dir] of [[34, -1], [110, 1]]) {
+      ctx.fillStyle = '#44403c';
+      ctx.beginPath();
+      ctx.ellipse(sx, 60, 18, 13, dir * 0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(sx, 48);
+      ctx.lineTo(sx + dir * 12, 34);
+      ctx.lineTo(sx + dir * 8, 52);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Testa + elmo cornuto furioso
+    ctx.fillStyle = '#292524';
+    drawRoundedPath(ctx, 50, 20, 44, 38, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.8;
+    ctx.stroke();
+
+    drawGlowEye(ctx, 63, 39, 3.2, '#ffffff', 'rgba(239, 68, 68, 1)');
+    drawGlowEye(ctx, 81, 39, 3.2, '#ffffff', 'rgba(239, 68, 68, 1)');
+
+    // Doppie mannaie dentate
+    for (const [ax, dir] of [[24, -1], [120, 1]]) {
+      ctx.save();
+      ctx.translate(ax, 84);
+      ctx.rotate(dir * sway * 1.6);
+      ctx.translate(-ax, -84);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.beginPath();
+      ctx.moveTo(ax, 54);
+      ctx.quadraticCurveTo(ax + dir * 24, 62, ax + dir * 18, 96);
+      ctx.lineTo(ax, 86);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  });
+
+  // 8d. MINI-BOSS ELITE: Campione Jotun — Vettoriale 4x Multi-Frame (184x208)
+  registerAnimated('enemy_elite', 184, 208, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    const aura = ctx.createRadialGradient(92, 104, 18, 92, 104, 86);
+    aura.addColorStop(0, 'rgba(245, 158, 11, 0.28)');
+    aura.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(92, 104, 86, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 48, 148 - stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    drawRoundedPath(ctx, 104, 148 + stride * 0.7, 32, 50, 9);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob);
+
+    const armor = ctx.createLinearGradient(34, 58, 150, 160);
+    armor.addColorStop(0, '#475569');
+    armor.addColorStop(0.5, '#1e293b');
+    armor.addColorStop(1, '#090d16');
+    ctx.fillStyle = armor;
+    drawRoundedPath(ctx, 36, 62, 112, 92, 20);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // Cuore cremisi/oro
+    const heart = ctx.createRadialGradient(92, 104, 4, 92, 104, 22);
+    heart.addColorStop(0, '#fef08a');
+    heart.addColorStop(0.5, '#f59e0b');
+    heart.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = heart;
+    ctx.beginPath();
+    ctx.arc(92, 104, 22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Corona d'oro + corna scure
+    for (const [hx, dir] of [[60, -1], [124, 1]]) {
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(hx, 38);
+      ctx.quadraticCurveTo(hx + dir * 28, 22, hx + dir * 24, 5);
+      ctx.quadraticCurveTo(hx + dir * 10, 18, hx - dir * 5, 30);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 58, 22, 68, 46, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    drawGlowEye(ctx, 78, 45, 4, '#fffbeb', 'rgba(251, 191, 36, 1)');
+    drawGlowEye(ctx, 106, 45, 4, '#fffbeb', 'rgba(251, 191, 36, 1)');
+
+    // Grande ascia bipenne
+    ctx.save();
+    ctx.translate(154, 86);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-154, -86);
+    ctx.strokeStyle = '#451a03';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(154, 28);
+    ctx.lineTo(154, 156);
+    ctx.stroke();
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(154, 34);
+    ctx.quadraticCurveTo(182, 46, 174, 82);
+    ctx.lineTo(154, 72);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  });
+
+  // 9. BOSS FINALE: Hrimthurs, Signore del Gelo — Vettoriale 4x Multi-Frame (280x320)
+  registerAnimated('boss', 280, 320, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
     const aura = ctx.createRadialGradient(140, 156, 30, 140, 156, 130);
     aura.addColorStop(0, 'rgba(56, 189, 248, 0.25)');
     aura.addColorStop(1, 'rgba(56, 189, 248, 0)');
@@ -1065,18 +1547,19 @@ export function generateHdTextures(textures) {
     ctx.arc(140, 156, 130, 0, Math.PI * 2);
     ctx.fill();
 
-    // Gambe corazzate colossali
     ctx.fillStyle = '#0f172a';
-    drawRoundedPath(ctx, 74, 224, 48, 78, 13);
+    drawRoundedPath(ctx, 74, 224 - stride * 0.9, 48, 78, 13);
     ctx.fill();
     ctx.strokeStyle = '#38bdf8';
     ctx.lineWidth = 2;
     ctx.stroke();
-    drawRoundedPath(ctx, 158, 224, 48, 78, 13);
+    drawRoundedPath(ctx, 158, 224 + stride * 0.9, 48, 78, 13);
     ctx.fill();
     ctx.stroke();
 
-    // Busto in piastre di ghiaccio nero e acciaio runico
+    ctx.save();
+    ctx.translate(0, bob * 1.1);
+
     const plate = ctx.createLinearGradient(54, 92, 226, 238);
     plate.addColorStop(0, '#64748b');
     plate.addColorStop(0.5, '#1e293b');
@@ -1091,7 +1574,6 @@ export function generateHdTextures(textures) {
     ctx.lineWidth = 2.6;
     ctx.stroke();
 
-    // Nucleo runico scarlatto pulsante sul petto
     const core = ctx.createRadialGradient(140, 162, 5, 140, 162, 34);
     core.addColorStop(0, '#ffffff');
     core.addColorStop(0.3, '#f87171');
@@ -1102,7 +1584,6 @@ export function generateHdTextures(textures) {
     ctx.arc(140, 162, 34, 0, Math.PI * 2);
     ctx.fill();
 
-    // Spallacci con grandi cristalli di ghiaccio sfaccettati
     const iceGrad = ctx.createLinearGradient(24, 62, 86, 132);
     iceGrad.addColorStop(0, '#f0f9ff');
     iceGrad.addColorStop(0.5, '#38bdf8');
@@ -1131,7 +1612,6 @@ export function generateHdTextures(textures) {
     ctx.fill();
     ctx.stroke();
 
-    // Corona di Corna Glaciali + Elmo
     ctx.fillStyle = iceGrad;
     ctx.beginPath();
     ctx.moveTo(96, 56);
@@ -1159,7 +1639,10 @@ export function generateHdTextures(textures) {
     drawGlowEye(ctx, 120, 69, 5.2, '#ffffff', 'rgba(56, 189, 248, 0.98)');
     drawGlowEye(ctx, 160, 69, 5.2, '#ffffff', 'rgba(56, 189, 248, 0.98)');
 
-    // Martello / Alabarda di Ghiaccio colossale
+    ctx.save();
+    ctx.translate(242, 148);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-242, -148);
     ctx.strokeStyle = '#451a03';
     ctx.lineWidth = 11;
     ctx.beginPath();
@@ -1173,9 +1656,12 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#f0f9ff';
     ctx.lineWidth = 2.6;
     ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
   });
 
-  // 10. Props scenici 4x (Pino, Monolite Runico, Braciere)
+  // 10. Props scenici 4x (Pino, Monolite Runico, Braciere, Cassa Runica, Altare Runico)
   registerCanvas(textures, 'prop_tree', 144, 196, (ctx) => {
     ctx.fillStyle = '#451a03';
     drawRoundedPath(ctx, 60, 138, 24, 52, 6);
@@ -1270,7 +1756,118 @@ export function generateHdTextures(textures) {
     ctx.fill();
   });
 
-  // 11. Proiettili e Gemme 4x
+  registerCanvas(textures, 'prop_crate', 88, 88, (ctx) => {
+    const wood = ctx.createLinearGradient(12, 16, 76, 78);
+    wood.addColorStop(0, '#92400e');
+    wood.addColorStop(0.55, '#78350f');
+    wood.addColorStop(1, '#451a03');
+    ctx.fillStyle = wood;
+    drawRoundedPath(ctx, 12, 18, 64, 58, 9);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Assi e bande in ferro
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(14, 34);
+    ctx.lineTo(74, 34);
+    ctx.moveTo(14, 62);
+    ctx.lineTo(74, 62);
+    ctx.stroke();
+
+    // Runa luminosa centrale
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(44, 38);
+    ctx.lineTo(44, 58);
+    ctx.moveTo(36, 44);
+    ctx.lineTo(52, 52);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'prop_shrine', 128, 160, (ctx) => {
+    const base = ctx.createLinearGradient(28, 90, 100, 148);
+    base.addColorStop(0, '#475569');
+    base.addColorStop(1, '#1e293b');
+    ctx.fillStyle = base;
+    drawRoundedPath(ctx, 26, 112, 76, 36, 10);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    const pillar = ctx.createLinearGradient(42, 22, 86, 116);
+    pillar.addColorStop(0, '#64748b');
+    pillar.addColorStop(1, '#1e293b');
+    ctx.fillStyle = pillar;
+    ctx.beginPath();
+    ctx.moveTo(64, 14);
+    ctx.lineTo(86, 36);
+    ctx.lineTo(84, 114);
+    ctx.lineTo(44, 114);
+    ctx.lineTo(42, 36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    const glow = ctx.createRadialGradient(64, 64, 4, 64, 64, 44);
+    glow.addColorStop(0, 'rgba(56, 189, 248, 0.72)');
+    glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(64, 64, 44, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(64, 38);
+    ctx.lineTo(64, 92);
+    ctx.moveTo(50, 56);
+    ctx.lineTo(78, 56);
+    ctx.moveTo(54, 72);
+    ctx.lineTo(74, 72);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'chest_valhalla', 96, 84, (ctx) => {
+    const halo = ctx.createRadialGradient(48, 42, 6, 48, 42, 44);
+    halo.addColorStop(0, 'rgba(251, 191, 36, 0.6)');
+    halo.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(48, 42, 44, 0, Math.PI * 2);
+    ctx.fill();
+
+    const wood = ctx.createLinearGradient(16, 22, 80, 74);
+    wood.addColorStop(0, '#b45309');
+    wood.addColorStop(1, '#451a03');
+    ctx.fillStyle = wood;
+    drawRoundedPath(ctx, 16, 28, 64, 42, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = '#f59e0b';
+    drawRoundedPath(ctx, 14, 22, 68, 16, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef3c7';
+    drawRoundedPath(ctx, 41, 34, 14, 18, 4);
+    ctx.fill();
+  });
+
+  // 11. Proiettili, Pickup e Gemme 4x
   registerCanvas(textures, 'axe_proj', 88, 88, (ctx) => {
     ctx.strokeStyle = '#451a03';
     ctx.lineWidth = 9;
@@ -1348,6 +1945,62 @@ export function generateHdTextures(textures) {
     ctx.fillStyle = '#f59e0b';
     drawRoundedPath(ctx, 19, 63, 26, 10, 4);
     ctx.fill();
+  });
+
+  registerCanvas(textures, 'frost_arrow', 64, 24, (ctx) => {
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(8, 12);
+    ctx.lineTo(52, 12);
+    ctx.stroke();
+    ctx.strokeStyle = '#7dd3fc';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.fillStyle = '#f0f9ff';
+    ctx.beginPath();
+    ctx.moveTo(60, 12);
+    ctx.lineTo(44, 4);
+    ctx.lineTo(48, 12);
+    ctx.lineTo(44, 20);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  registerCanvas(textures, 'meat_pickup', 56, 48, (ctx) => {
+    ctx.fillStyle = '#fef3c7';
+    drawRoundedPath(ctx, 32, 19, 18, 10, 4);
+    ctx.fill();
+    const meat = ctx.createLinearGradient(8, 10, 38, 38);
+    meat.addColorStop(0, '#ef4444');
+    meat.addColorStop(1, '#7f1d1d');
+    ctx.fillStyle = meat;
+    ctx.beginPath();
+    ctx.ellipse(23, 24, 16, 12, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'magnet_pickup', 56, 56, (ctx) => {
+    const mg = ctx.createRadialGradient(28, 28, 3, 28, 28, 25);
+    mg.addColorStop(0, 'rgba(56, 189, 248, 0.55)');
+    mg.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = mg;
+    ctx.beginPath();
+    ctx.arc(28, 28, 25, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.arc(28, 24, 14, 0, Math.PI);
+    ctx.stroke();
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(10, 12, 8, 12);
+    ctx.fillRect(38, 12, 8, 12);
   });
 
   const drawHdGem = (key, mainHex, lightHex, glowRgba) => {

@@ -137,6 +137,20 @@ export const UPGRADE_CATALOG = [
     ]
   },
   {
+    id: 'hammer',
+    type: 'weapon',
+    name: 'Martello Sismico',
+    maxLevel: 5,
+    accent: '#fb923c',
+    desc: [
+      'Scatena onde sismiche attorno all’eroe che respingono i nemici.',
+      '+20% Raggio sismico e +25% Danno.',
+      'Doppia onda tellurica e ricarica più rapida.',
+      '+25% Raggio e contraccolpo pesante.',
+      'Furia Tellurica: 3 onde concentriche devastanti.'
+    ]
+  },
+  {
     id: 'might',
     type: 'passive',
     name: 'Furia di Tyr',
@@ -207,6 +221,65 @@ export const UPGRADE_CATALOG = [
     ]
   }
 ];
+
+export const WEAPON_EVOLUTIONS = {
+  axe: {
+    id: 'evo_axe',
+    weaponId: 'axe',
+    passiveId: 'might',
+    name: 'Ascia Cremisi del Ragnarok',
+    accent: '#fbbf24',
+    description: 'EVOLUZIONE · Asce infuocate che esplodono ad ogni impatto.'
+  },
+  aura: {
+    id: 'evo_aura',
+    weaponId: 'aura',
+    passiveId: 'regen',
+    name: 'Manto di Surtr',
+    accent: '#f97316',
+    description: 'EVOLUZIONE · Doppio cerchio di fuoco che cura +2 HP ad impulso.'
+  },
+  lightning: {
+    id: 'evo_lightning',
+    weaponId: 'lightning',
+    passiveId: 'area',
+    name: 'Tempesta di Mjolnir',
+    accent: '#38bdf8',
+    description: 'EVOLUZIONE · Fulmini a catena che rimbalzano sui nemici vicini.'
+  },
+  blades: {
+    id: 'evo_blades',
+    weaponId: 'blades',
+    passiveId: 'swift',
+    name: 'Corona degli Einherjar',
+    accent: '#fde047',
+    description: 'EVOLUZIONE · 6 lame d’oro runico ad altissima rotazione.'
+  },
+  dagger: {
+    id: 'evo_dagger',
+    weaponId: 'dagger',
+    passiveId: 'magnet',
+    name: 'Pioggia di Niflheim',
+    accent: '#f0abfc',
+    description: 'EVOLUZIONE · Ventaglio da 8 pugnali perforanti ad altissimo critico.'
+  },
+  orb: {
+    id: 'evo_orb',
+    weaponId: 'orb',
+    passiveId: 'area',
+    name: 'Stella del Fimbulvetr',
+    accent: '#7dd3fc',
+    description: 'EVOLUZIONE · Esplosioni colossali con 3 onde secondarie di brina.'
+  },
+  hammer: {
+    id: 'evo_hammer',
+    weaponId: 'hammer',
+    passiveId: 'might',
+    name: 'Maglio Spezzamondi',
+    accent: '#fb923c',
+    description: 'EVOLUZIONE · Onda sismica gigante con fessure critiche dorate.'
+  }
+};
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -315,6 +388,18 @@ export class GameScene extends Phaser.Scene {
     });
     this.activeGems = [];
 
+    // Pool proiettili nemici (frecce di brina) e oggetti interattivi (casse, altari, forzieri, pickup)
+    this.enemyProjPool = this.physics.add.group({
+      maxSize: 40,
+      runChildUpdate: false
+    });
+    this.activeEnemyProjectiles = [];
+
+    this.crateItems = [];
+    this.shrineItems = [];
+    this.pickupItems = [];
+    this._initWorldInteractables();
+
     this.bladeSprites = [];
     this.bladeTrails = Array.from({ length: 48 }, () => ({
       active: false,
@@ -395,6 +480,16 @@ export class GameScene extends Phaser.Scene {
     }
     this.activeGems.length = 0;
 
+    for (const ep of this.activeEnemyProjectiles) {
+      ep.disableBody(true, true);
+    }
+    this.activeEnemyProjectiles.length = 0;
+
+    for (const pk of this.pickupItems) {
+      pk.active = false;
+      pk.setVisible(false);
+    }
+
     for (const b of this.bladeSprites) {
       b.destroy();
     }
@@ -424,9 +519,12 @@ export class GameScene extends Phaser.Scene {
     const textureMap = {
       warrior: 'hero_warrior',
       assassin: 'hero_assassin',
-      mage: 'hero_mage'
+      mage: 'hero_mage',
+      juggernaut: 'hero_juggernaut'
     };
     const chosenTexture = runConfig.textureKey || textureMap[this.activeHeroId] || 'hero_warrior';
+    this.heroBaseTexKey = chosenTexture;
+    this.heroWalkPhase = 0;
     if (this.textures.exists(chosenTexture)) {
       this.hero.setTexture(chosenTexture);
     }
@@ -444,6 +542,13 @@ export class GameScene extends Phaser.Scene {
 
     this.elapsedSec = 0;
     this.kills = 0;
+    this.miniBossesSlain = 0;
+    this.cratesBroken = 0;
+    this.shrinesActivated = 0;
+    this.evolutionsForged = 0;
+    this.miniBossSchedule = [60, 120, 180];
+    this.nextMiniBossIdx = 0;
+    this.activeMiniBoss = null;
     this.bossSpawned = false;
     this.bossDefeated = false;
     this.bossSprite = null;
@@ -451,6 +556,8 @@ export class GameScene extends Phaser.Scene {
     this.nextEncirclementSec = GAME_CONFIG.ENCIRCLEMENT_INTERVAL_SEC;
     this.gemCombo = 0;
     this.gemComboTimer = 0;
+    this.activeBuff = null;
+    this.evolvedWeapons = {};
 
     const eff = runConfig.effectiveStats || {};
     this.baseRunStats = {
@@ -485,6 +592,7 @@ export class GameScene extends Phaser.Scene {
       blades: 0,
       dagger: 0,
       orb: 0,
+      hammer: 0,
       might: 0,
       swift: 0,
       area: 0,
@@ -504,6 +612,7 @@ export class GameScene extends Phaser.Scene {
       lightning: 0.8,
       dagger: 0.25,
       orb: 0.35,
+      hammer: 0.4,
       bladeAngle: 0,
       bossAttack: 2.8
     };
@@ -514,6 +623,7 @@ export class GameScene extends Phaser.Scene {
 
     this._repositionAllDecals();
     this._repositionAllProps();
+    this._repositionCratesAndShrines();
     this.bridge?.onBossHudUpdate?.(null);
     this._syncHud();
   }
@@ -529,18 +639,57 @@ export class GameScene extends Phaser.Scene {
   }
 
   resumeGame() {
-    if (this.gameState !== 'PAUSED' && this.gameState !== 'LEVEL_UP') return;
+    if (this.gameState !== 'PAUSED' && this.gameState !== 'LEVEL_UP' && this.gameState !== 'CHEST') return;
     this.gameState = 'PLAYING';
     this.physics.resume();
     this._syncHud();
   }
 
+  _getAvailableEvolutions() {
+    const out = [];
+    for (const weaponId of Object.keys(WEAPON_EVOLUTIONS)) {
+      const evo = WEAPON_EVOLUTIONS[weaponId];
+      if (this.levels[weaponId] >= 5 && !this.evolvedWeapons[weaponId] && this.levels[evo.passiveId] >= 1) {
+        out.push(evo);
+      }
+    }
+    return out;
+  }
+
   applyUpgrade(upgradeId) {
+    // Gestione evoluzione leggendaria (evo_*)
+    if (typeof upgradeId === 'string' && upgradeId.startsWith('evo_')) {
+      const evo = Object.values(WEAPON_EVOLUTIONS).find((e) => e.id === upgradeId);
+      if (evo && !this.evolvedWeapons[evo.weaponId]) {
+        this.evolvedWeapons[evo.weaponId] = true;
+        this.evolutionsForged += 1;
+        audio.playEvolution();
+        if (evo.weaponId === 'blades') {
+          this._rebuildValkyrieBlades();
+        }
+      }
+      this.resumeGame();
+      return;
+    }
+
     if (!(upgradeId in this.levels)) return;
     this.levels[upgradeId] = Math.min(5, this.levels[upgradeId] + 1);
 
-    this.stats.mightMult = this.baseRunStats.mightMult + this.levels.might * 0.18;
-    this.stats.speedMult = 1 + this.levels.swift * 0.12;
+    this._recomputeStatsFromLevels();
+
+    if (upgradeId === 'blades') {
+      this._rebuildValkyrieBlades();
+    }
+
+    this.resumeGame();
+  }
+
+  _recomputeStatsFromLevels() {
+    const furyBonus = this.activeBuff?.id === 'fury' ? 0.35 : 0;
+    const swiftBonus = this.activeBuff?.id === 'frost_shield' ? 0.25 : 0;
+
+    this.stats.mightMult = this.baseRunStats.mightMult + this.levels.might * 0.18 + furyBonus;
+    this.stats.speedMult = 1 + this.levels.swift * 0.12 + swiftBonus;
     this.stats.areaMult = this.baseRunStats.areaMult + this.levels.area * 0.16;
     this.stats.magnetRadius = Math.round(84 * this.baseRunStats.magnetMult * (1 + this.levels.magnet * 0.35));
 
@@ -552,18 +701,22 @@ export class GameScene extends Phaser.Scene {
     }
     const regenRates = [0, 1.5, 3.0, 4.5, 6.0, 8.0];
     this.stats.regenPerSec = regenRates[this.levels.regen] || 0;
-
-    if (upgradeId === 'blades') {
-      this._rebuildValkyrieBlades();
-    }
-
-    this.resumeGame();
   }
 
   _getBuildSnapshot() {
     return UPGRADE_CATALOG
       .filter((u) => this.levels[u.id] > 0)
-      .map((u) => ({ ...u, level: this.levels[u.id] }));
+      .map((u) => {
+        const evolved = Boolean(this.evolvedWeapons?.[u.id]);
+        const evo = evolved ? WEAPON_EVOLUTIONS[u.id] : null;
+        return {
+          ...u,
+          name: evo ? evo.name : u.name,
+          accent: evo ? evo.accent : u.accent,
+          level: this.levels[u.id],
+          evolved
+        };
+      });
   }
 
   update(_time, deltaMs) {
@@ -604,19 +757,43 @@ export class GameScene extends Phaser.Scene {
       this._spawnEncirclementRing(waveIdx);
     }
 
+    // Mini-boss Elite ad ogni minuto (60s, 120s, 180s)
+    if (
+      !this.bossSpawned &&
+      this.nextMiniBossIdx < this.miniBossSchedule.length &&
+      this.elapsedSec >= this.miniBossSchedule[this.nextMiniBossIdx]
+    ) {
+      const mbIdx = this.nextMiniBossIdx;
+      this.nextMiniBossIdx += 1;
+      this._spawnMiniBoss(mbIdx);
+    }
+
     if (!this.bossSpawned && this.elapsedSec >= GAME_CONFIG.RUN_DURATION_SEC) {
       this._triggerBossSequence();
       return;
     }
 
+    // Timer buff temporaneo altare
+    if (this.activeBuff) {
+      this.activeBuff.remaining -= dt;
+      if (this.activeBuff.remaining <= 0) {
+        this.activeBuff = null;
+        this._recomputeStatsFromLevels();
+      }
+    }
+
     this._updateSpawning(dt, waveIdx);
 
-    // 5. Armi, movimento fluido attorno agli ostacoli ed effetti grafici a 60 FPS
+    // 5. Armi, altari/casse, nemici, proiettili nemici ed effetti grafici a 60 FPS
+    this.auraGfx.clear();
+    this._updateCratesAndShrines(dt);
     this._updateWeapons(dt);
     this._updateEnemiesAndBoss(dt);
     this._resolvePropCollisions();
     this._updateProjectiles(dt);
+    this._updateEnemyProjectiles(dt);
     this._updateGems(dt);
+    this._updatePickups(dt);
     this._updateTelegraphs(dt);
     this._updateVfx(dt);
     this._updateDamageTexts(dt);
@@ -639,7 +816,16 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  _updateHeroMovement(_dt) {
+  _applyWalkTextureFrame(sprite, baseKey, phase) {
+    if (!sprite || !baseKey) return;
+    const fIdx = Math.floor(phase) % 4;
+    const frameKey = `${baseKey}_f${fIdx}`;
+    if (this.textures.exists(frameKey) && sprite.texture !== frameKey) {
+      sprite.setTexture(frameKey);
+    }
+  }
+
+  _updateHeroMovement(dt) {
     // Sicurezza touch mobile: se il browser ha perso pointerup (gesture/bordo), sblocca subito il joystick
     if (this.joyActive && this.input?.manager?.pointers) {
       const activePtr = this.input.manager.pointers.find((p) => p && p.id === this.joyPointerId);
@@ -672,11 +858,16 @@ export class GameScene extends Phaser.Scene {
     }
 
     const baseS = this.heroBaseScale || 1.30;
-    if (Math.abs(vx) > 0.05 || Math.abs(vy) > 0.05) {
+    const isMoving = Math.abs(vx) > 0.05 || Math.abs(vy) > 0.05;
+    if (isMoving) {
+      this.heroWalkPhase = (this.heroWalkPhase || 0) + (dt || 0.016) * 10;
+      this._applyWalkTextureFrame(this.hero, this.heroBaseTexKey, this.heroWalkPhase);
       const bob = Math.sin(this.elapsedSec * 14);
-      this.hero.setScale(baseS * (1 - bob * 0.05), baseS * (1 + bob * 0.06));
-      this.hero.setAngle(bob * 3.5);
+      this.hero.setScale(baseS * (1 - bob * 0.03), baseS * (1 + bob * 0.04));
+      this.hero.setAngle(bob * 2.5);
     } else {
+      this.heroWalkPhase = 0;
+      this._applyWalkTextureFrame(this.hero, this.heroBaseTexKey, 0);
       const idle = Math.sin(this.elapsedSec * 3.5);
       this.hero.setScale(baseS, baseS * (1 + idle * 0.02));
       this.hero.setAngle(0);
@@ -785,9 +976,11 @@ export class GameScene extends Phaser.Scene {
 
       let archetype = 'swarm';
       const roll = Math.random();
-      if (waveIdx >= 1 && roll < 0.22) archetype = 'fast';
-      if (waveIdx >= 2 && roll > 0.8) archetype = 'tank';
-      if (waveIdx >= 5 && roll > 0.68) archetype = 'tank';
+      if (waveIdx >= 1 && roll < 0.2) archetype = 'fast';
+      if (waveIdx >= 1 && roll >= 0.2 && roll < 0.34) archetype = 'archer';
+      if (waveIdx >= 2 && roll >= 0.72 && roll < 0.84) archetype = 'berserker';
+      if (waveIdx >= 2 && roll >= 0.84) archetype = 'tank';
+      if (waveIdx >= 5 && roll >= 0.68) archetype = 'tank';
 
       this._spawnEnemy(archetype, waveIdx);
     }
@@ -809,13 +1002,20 @@ export class GameScene extends Phaser.Scene {
     const sx = this.hero.x + Math.cos(angle) * spawnDist;
     const sy = this.hero.y + Math.sin(angle) * spawnDist;
 
-    const texKey =
-      archetype === 'tank' ? 'enemy_tank' : archetype === 'fast' ? 'enemy_fast' : 'enemy_swarm';
+    const texMap = {
+      tank: 'enemy_tank',
+      fast: 'enemy_fast',
+      archer: 'enemy_archer',
+      berserker: 'enemy_berserker',
+      swarm: 'enemy_swarm'
+    };
+    const texKey = texMap[archetype] || 'enemy_swarm';
 
     const enemy = this.enemyPool.get(sx, sy, texKey);
     if (!enemy) return;
 
     enemy.setTexture(texKey);
+    enemy.baseTexKey = texKey;
     enemy.enableBody(true, sx, sy, true, true);
     enemy.clearTint();
     enemy.setAlpha(1);
@@ -846,6 +1046,35 @@ export class GameScene extends Phaser.Scene {
       const hbH = this.hdMode ? 32 : 11;
       enemy.body.setSize(hbW, hbH);
       enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
+    } else if (archetype === 'archer') {
+      enemy.baseScale = this.hdMode ? 0.322 : 1.18;
+      enemy.setScale(enemy.baseScale);
+      enemy.maxHp = Math.round(28 * hpScale);
+      enemy.speed = 62 * speedScale;
+      enemy.damage = 10;
+      enemy.xpValue = 4;
+      enemy.archerCooldown = 1.6 + Math.random() * 0.9;
+      enemy.archerWindup = 0;
+      const hbW = this.hdMode ? 54 : 18;
+      const hbH = this.hdMode ? 32 : 11;
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
+    } else if (archetype === 'berserker') {
+      enemy.baseScale = this.hdMode ? 0.345 : 1.28;
+      enemy.setScale(enemy.baseScale);
+      enemy.maxHp = Math.round(58 * hpScale);
+      enemy.speed = 70 * speedScale;
+      enemy.damage = 15;
+      enemy.xpValue = 6;
+      enemy.chargeCooldown = 2.4 + Math.random();
+      enemy.chargeWindup = 0;
+      enemy.chargeTime = 0;
+      enemy.chargeVx = 0;
+      enemy.chargeVy = 0;
+      const hbW = this.hdMode ? 62 : 22;
+      const hbH = this.hdMode ? 36 : 13;
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
     } else {
       enemy.baseScale = this.hdMode ? 0.322 : 1.19;
       enemy.setScale(enemy.baseScale);
@@ -862,10 +1091,11 @@ export class GameScene extends Phaser.Scene {
     enemy.hp = enemy.maxHp;
     enemy.archetype = archetype;
     enemy.isBoss = false;
+    enemy.isMiniBoss = false;
     enemy.knockbackTimer = 0;
     enemy.flashTimer = 0;
     enemy.bladeCooldown = 0;
-    enemy.walkPhase = Math.random() * 6.28;
+    enemy.walkPhase = Math.random() * 4;
     enemy.setDepth(computeEntityDepth(sy));
 
     const shOffset = archetype === 'tank' ? 23 : 15;
@@ -882,6 +1112,62 @@ export class GameScene extends Phaser.Scene {
     if (!this.activeEnemies.includes(enemy)) {
       this.activeEnemies.push(enemy);
     }
+  }
+
+  _spawnMiniBoss(idx = 0) {
+    const ang = Math.random() * Math.PI * 2;
+    const dist = 280;
+    const bx = this.hero.x + Math.cos(ang) * dist;
+    const by = this.hero.y + Math.sin(ang) * dist;
+
+    if (this.activeEnemies.length >= GAME_CONFIG.MAX_ENEMIES) {
+      const drop = this.activeEnemies.pop();
+      if (drop) this._recycleEnemy(drop);
+    }
+
+    const elite = this.enemyPool.get(bx, by, 'enemy_elite');
+    if (!elite) return;
+
+    elite.setTexture('enemy_elite');
+    elite.baseTexKey = 'enemy_elite';
+    elite.enableBody(true, bx, by, true, true);
+    elite.baseScale = this.hdMode ? 0.385 : 1.44;
+    elite.setScale(elite.baseScale);
+    elite.clearTint();
+    elite.setAlpha(1);
+    elite.setVisible(true);
+    elite.isBoss = false;
+    elite.isMiniBoss = true;
+    elite.archetype = 'elite';
+    elite.maxHp = 420 + idx * 240;
+    elite.hp = elite.maxHp;
+    elite.speed = 66 + idx * 4;
+    elite.damage = 20;
+    elite.xpValue = 25;
+    elite.knockbackTimer = 0;
+    elite.flashTimer = 0;
+    elite.bladeCooldown = 0;
+    elite.walkPhase = 0;
+    elite.setDepth(computeEntityDepth(by));
+
+    const hbW = this.hdMode ? 84 : 30;
+    const hbH = this.hdMode ? 48 : 18;
+    elite.body.setSize(hbW, hbH);
+    elite.body.setOffset(Math.max(0, (elite.width - hbW) / 2), Math.max(0, elite.height - hbH - 4));
+
+    if (!elite.shadow) {
+      elite.shadow = this.add.image(bx, by + 28, 'shadow_ellipse').setDepth(DEPTH_LAYERS.SHADOWS).setAlpha(0.5);
+    } else {
+      elite.shadow.setPosition(bx, by + 28).setVisible(true).setDepth(DEPTH_LAYERS.SHADOWS);
+    }
+    elite.shadow.setScale(this.hdMode ? 0.52 : 1.9);
+
+    this.activeMiniBoss = elite;
+    this.activeEnemies.push(elite);
+    audio.playBossAlarm();
+    const titles = ['Campione Jotun', 'Valkiria Caduta', 'Signore delle Ceneri'];
+    elite.displayName = `${titles[idx % titles.length]} (Elite)`;
+    this.bridge?.onBossHudUpdate?.({ name: elite.displayName, hp: elite.hp, maxHp: elite.maxHp });
   }
 
   async _triggerBossSequence() {
@@ -919,6 +1205,7 @@ export class GameScene extends Phaser.Scene {
     if (!boss) return;
 
     boss.setTexture('boss');
+    boss.baseTexKey = 'boss';
     boss.enableBody(true, bx, by, true, true);
     boss.baseScale = this.hdMode ? 0.413 : 1.60;
     boss.setScale(boss.baseScale);
@@ -926,6 +1213,7 @@ export class GameScene extends Phaser.Scene {
     boss.setAlpha(1);
     boss.setVisible(true);
     boss.isBoss = true;
+    boss.isMiniBoss = false;
     boss.archetype = 'boss';
     boss.maxHp = 4500;
     boss.hp = boss.maxHp;
@@ -960,7 +1248,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Armi Automatiche + Effetti Runici Premium
+   * Armi Automatiche + Evoluzioni + Effetti Runici Premium
    */
   _updateWeapons(dt) {
     // ARMA 1: Ascia Runica (proiettili con scia infuocata)
@@ -969,58 +1257,71 @@ export class GameScene extends Phaser.Scene {
       this.timers.axe -= dt;
       if (this.timers.axe <= 0) {
         const cooldowns = [0, 1.0, 0.9, 0.78, 0.68, 0.55];
-        this.timers.axe = cooldowns[axeLv];
+        this.timers.axe = this.evolvedWeapons.axe ? 0.46 : cooldowns[axeLv];
         this._fireRunicAxes(axeLv);
       }
     }
 
-    // ARMA 5: Pugnali d'Ombra (Assassina - raffiche rapidissime ad alto critico)
+    // ARMA 5: Pugnali d'Ombra
     const daggerLv = this.levels.dagger;
     if (daggerLv > 0) {
       this.timers.dagger -= dt;
       if (this.timers.dagger <= 0) {
         const cds = [0, 0.56, 0.48, 0.42, 0.36, 0.3];
-        this.timers.dagger = cds[daggerLv];
+        this.timers.dagger = this.evolvedWeapons.dagger ? 0.25 : cds[daggerLv];
         this._fireShadowDaggers(daggerLv);
       }
     }
 
-    // ARMA 6: Globo Arcano (Maga - sfere di gelo esplosive ad area)
+    // ARMA 6: Globo Arcano
     const orbLv = this.levels.orb;
     if (orbLv > 0) {
       this.timers.orb -= dt;
       if (this.timers.orb <= 0) {
         const cds = [0, 1.35, 1.2, 1.05, 0.9, 0.78];
-        this.timers.orb = cds[orbLv];
+        this.timers.orb = this.evolvedWeapons.orb ? 0.68 : cds[orbLv];
         this._fireArcaneOrbs(orbLv);
       }
     }
 
-    // ARMA 2: Aura del Crepuscolo (cerchio runico rotante + onda espansiva)
+    // ARMA 7: Martello Sismico (Bjorn / sbloccabile)
+    const hammerLv = this.levels.hammer;
+    if (hammerLv > 0) {
+      this.timers.hammer -= dt;
+      if (this.timers.hammer <= 0) {
+        const cds = [0, 1.45, 1.3, 1.15, 1.0, 0.85];
+        this.timers.hammer = this.evolvedWeapons.hammer ? 0.72 : cds[hammerLv];
+        this._fireSeismicHammer(hammerLv);
+      }
+    }
+
+    // ARMA 2: Aura del Crepuscolo / Manto di Surtr
     const auraLv = this.levels.aura;
     if (auraLv > 0) {
-      const baseRadius = (62 + auraLv * 13) * this.stats.areaMult;
+      const evoAura = Boolean(this.evolvedWeapons.aura);
+      const baseRadius = (62 + auraLv * 13 + (evoAura ? 18 : 0)) * this.stats.areaMult;
       const pulse = 0.97 + Math.sin(this.elapsedSec * 5.2) * 0.03;
       const drawRadius = baseRadius * pulse;
       const cx = this.hero.x;
       const cy = this.hero.y + 10;
 
-      this.auraGfx.clear();
-      // Bagliore violaceo morbido
-      this.auraGfx.fillStyle(0x7e22ce, 0.14);
+      const fillCol = evoAura ? 0xf97316 : 0x7e22ce;
+      const ringCol = evoAura ? 0xfbbf24 : 0xc084fc;
+      const innerCol = evoAura ? 0xfde68a : 0xf0abfc;
+
+      this.auraGfx.fillStyle(fillCol, 0.14);
       this.auraGfx.fillCircle(cx, cy, drawRadius);
-      this.auraGfx.fillStyle(0xc084fc, 0.08);
+      this.auraGfx.fillStyle(ringCol, 0.09);
       this.auraGfx.fillCircle(cx, cy, drawRadius * 0.66);
 
-      // Anello esterno con tacche runiche rotanti
-      this.auraGfx.lineStyle(2, 0xc084fc, 0.65);
+      this.auraGfx.lineStyle(2, ringCol, 0.72);
       this.auraGfx.strokeCircle(cx, cy, drawRadius);
-      this.auraGfx.lineStyle(1.5, 0xf0abfc, 0.38);
+      this.auraGfx.lineStyle(1.5, innerCol, 0.42);
       this.auraGfx.strokeCircle(cx, cy, drawRadius * 0.72);
 
-      const runeCount = 8;
-      const rot = this.elapsedSec * 1.4;
-      this.auraGfx.fillStyle(0xe879f9, 0.85);
+      const runeCount = evoAura ? 12 : 8;
+      const rot = this.elapsedSec * (evoAura ? 2.1 : 1.4);
+      this.auraGfx.fillStyle(innerCol, 0.88);
       for (let r = 0; r < runeCount; r++) {
         const ang = rot + (r * Math.PI * 2) / runeCount;
         const rx = cx + Math.cos(ang) * (drawRadius - 3);
@@ -1031,12 +1332,12 @@ export class GameScene extends Phaser.Scene {
       this.timers.aura -= dt;
       if (this.timers.aura <= 0) {
         const tickRates = [0, 0.5, 0.44, 0.38, 0.33, 0.26];
-        this.timers.aura = tickRates[auraLv];
-        const auraDmg = Math.round((9 + auraLv * 6) * this.stats.mightMult);
+        this.timers.aura = evoAura ? 0.23 : tickRates[auraLv];
+        const auraDmg = Math.round((9 + auraLv * 6) * (evoAura ? 1.45 : 1) * this.stats.mightMult);
         const rSq = baseRadius * baseRadius;
         let hitAny = false;
 
-        this.activeAuraPulses.push({ x: cx, y: cy, maxR: drawRadius, life: 0, dur: 0.28 });
+        this.activeAuraPulses.push({ x: cx, y: cy, maxR: drawRadius, life: 0, dur: 0.28, color: ringCol });
 
         for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
           const e = this.activeEnemies[i];
@@ -1044,36 +1345,39 @@ export class GameScene extends Phaser.Scene {
           const dx = e.x - cx;
           const dy = e.y - cy;
           if (dx * dx + dy * dy <= rSq) {
-            this._damageEnemy(e, auraDmg, dx, dy, e.isBoss ? 15 : 95, false, 0xd8b4fe);
+            this._damageEnemy(e, auraDmg, dx, dy, e.isBoss ? 15 : 95, false, ringCol);
             hitAny = true;
           }
         }
+        this._damageCratesInRadius(cx, cy, baseRadius);
+        if (evoAura && hitAny && this.stats.hp < this.stats.maxHp) {
+          this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 2);
+        }
         if (hitAny) audio.playAuraPulse();
       }
-    } else {
-      this.auraGfx.clear();
     }
 
-    // ARMA 3: Saetta di Thor (fulmini persistenti e frastagliati)
+    // ARMA 3: Saetta di Thor
     const lightLv = this.levels.lightning;
     if (lightLv > 0) {
       this.timers.lightning -= dt;
       if (this.timers.lightning <= 0) {
         const cds = [0, 2.4, 2.1, 1.8, 1.5, 1.2];
-        this.timers.lightning = cds[lightLv];
+        this.timers.lightning = this.evolvedWeapons.lightning ? 0.95 : cds[lightLv];
         this._castLightningStrikes(lightLv);
       }
     }
 
-    // ARMA 4: Lame di Valchiria (orbitanti con scia curva)
+    // ARMA 4: Lame di Valchiria / Corona degli Einherjar
     const bladeLv = this.levels.blades;
     if (bladeLv > 0 && this.bladeSprites.length > 0) {
-      const orbitSpeed = 2.8 + bladeLv * 0.45;
-      const orbitRadius = (66 + bladeLv * 7) * this.stats.areaMult;
+      const evoBlades = Boolean(this.evolvedWeapons.blades);
+      const orbitSpeed = (2.8 + bladeLv * 0.45) * (evoBlades ? 1.35 : 1);
+      const orbitRadius = (66 + bladeLv * 7 + (evoBlades ? 12 : 0)) * this.stats.areaMult;
       this.timers.bladeAngle += orbitSpeed * dt;
 
       const count = this.bladeSprites.length;
-      const bladeDmg = Math.round((15 + bladeLv * 7) * this.stats.mightMult);
+      const bladeDmg = Math.round((15 + bladeLv * 7) * (evoBlades ? 1.45 : 1) * this.stats.mightMult);
       const hitRadiusSq = 30 * 30;
 
       for (let i = 0; i < count; i++) {
@@ -1084,7 +1388,6 @@ export class GameScene extends Phaser.Scene {
         b.setRotation(ang + Math.PI / 2);
         b.setDepth(computeEntityDepth(b.y) + 20);
 
-        // Registra punto su ring-buffer fisso per scia luminosa (zero allocazioni GC)
         const trailSlot = this.bladeTrails[this._bladeTrailCursor];
         this._bladeTrailCursor = (this._bladeTrailCursor + 1) % this.bladeTrails.length;
         trailSlot.active = true;
@@ -1093,14 +1396,16 @@ export class GameScene extends Phaser.Scene {
         trailSlot.life = 0;
         trailSlot.dur = 0.16;
 
+        this._damageCratesInRadius(b.x, b.y, 26);
+
         for (let j = this.activeEnemies.length - 1; j >= 0; j--) {
           const e = this.activeEnemies[j];
           if (!e.active || e.bladeCooldown > 0) continue;
           const dx = e.x - b.x;
           const dy = e.y - b.y;
           if (dx * dx + dy * dy <= hitRadiusSq) {
-            e.bladeCooldown = 0.24;
-            const isCrit = Math.random() < 0.2;
+            e.bladeCooldown = evoBlades ? 0.18 : 0.24;
+            const isCrit = Math.random() < (evoBlades ? 0.32 : 0.2);
             this._damageEnemy(
               e,
               isCrit ? Math.round(bladeDmg * 1.6) : bladeDmg,
@@ -1108,7 +1413,7 @@ export class GameScene extends Phaser.Scene {
               e.y - this.hero.y,
               115,
               isCrit,
-              0xbae6fd
+              evoBlades ? 0xfde047 : 0xbae6fd
             );
           }
         }
@@ -1124,10 +1429,12 @@ export class GameScene extends Phaser.Scene {
     if (lv <= 0) return;
 
     const counts = [0, 2, 3, 3, 4, 5];
-    const count = counts[lv];
+    const evo = Boolean(this.evolvedWeapons?.blades);
+    const count = evo ? 6 : counts[lv];
     const bladeScale = this.hdMode ? 0.33 : 1.18;
     for (let i = 0; i < count; i++) {
       const blade = this.add.image(this.hero.x, this.hero.y, 'blade_proj').setScale(bladeScale);
+      if (evo) blade.setTintFill(0xfde047);
       this.bladeSprites.push(blade);
     }
   }
@@ -1170,15 +1477,16 @@ export class GameScene extends Phaser.Scene {
   _fireRunicAxes(level) {
     if (this.activeEnemies.length === 0) return;
 
+    const evo = Boolean(this.evolvedWeapons?.axe);
     const counts = [0, 1, 2, 2, 3, 4];
     const pierces = [0, 1, 1, 2, 2, 3];
-    const count = counts[level];
-    const pierce = pierces[level];
+    const count = evo ? 5 : counts[level];
+    const pierce = evo ? 4 : pierces[level];
     const targets = this._getNearestActiveEnemies(540 * 540, count);
     if (targets.length === 0) return;
 
-    const dmg = Math.round((19 + level * 8) * this.stats.mightMult);
-    const speed = 300 + level * 22;
+    const dmg = Math.round((19 + level * 8) * (evo ? 1.35 : 1) * this.stats.mightMult);
+    const speed = 300 + level * 22 + (evo ? 40 : 0);
 
     audio.playThrow();
 
@@ -1192,13 +1500,16 @@ export class GameScene extends Phaser.Scene {
       if (!proj) break;
 
       proj.setTexture('axe_proj');
+      proj.clearTint();
+      if (evo) proj.setTintFill(0xfbbf24);
       proj.enableBody(true, this.hero.x, this.hero.y, true, true);
       const axeBase = this.hdMode ? 0.32 : 1.22;
-      proj.baseScale = axeBase * (1 + (this.stats.areaMult - 1) * 0.45);
+      proj.baseScale = axeBase * (1 + (this.stats.areaMult - 1) * 0.45) * (evo ? 1.18 : 1);
       proj.setScale(proj.baseScale);
       proj.setDepth(DEPTH_LAYERS.VFX - 10);
       proj.setVelocity(Math.cos(baseAng) * speed, Math.sin(baseAng) * speed);
       proj.kind = 'axe';
+      proj.evolved = evo;
       proj.damage = dmg;
       proj.pierce = pierce;
       proj.life = 1.65;
@@ -1218,18 +1529,19 @@ export class GameScene extends Phaser.Scene {
     const targets = this._getNearestActiveEnemies(520 * 520, 1);
     if (targets.length === 0) return;
 
+    const evo = Boolean(this.evolvedWeapons?.dagger);
     const counts = [0, 1, 2, 2, 3, 5];
     const pierces = [0, 1, 1, 2, 2, 3];
-    const count = counts[level];
-    const pierce = pierces[level];
-    const dmg = Math.round((13 + level * 6) * this.stats.mightMult);
-    const speed = 440 + level * 25;
+    const count = evo ? 8 : counts[level];
+    const pierce = evo ? 4 : pierces[level];
+    const dmg = Math.round((13 + level * 6) * (evo ? 1.32 : 1) * this.stats.mightMult);
+    const speed = 440 + level * 25 + (evo ? 60 : 0);
 
     audio.playThrow();
 
     const target = targets[0].enemy;
     const centerAng = Math.atan2(target.y - this.hero.y, target.x - this.hero.x);
-    const spread = 0.14;
+    const spread = evo ? 0.11 : 0.14;
 
     for (let i = 0; i < count; i++) {
       const ang = centerAng + (i - (count - 1) / 2) * spread;
@@ -1237,6 +1549,8 @@ export class GameScene extends Phaser.Scene {
       if (!proj) break;
 
       proj.setTexture('dagger_proj');
+      proj.clearTint();
+      if (evo) proj.setTintFill(0xf0abfc);
       proj.enableBody(true, this.hero.x, this.hero.y, true, true);
       proj.baseScale = this.hdMode ? 0.32 : 1.1;
       proj.setScale(proj.baseScale);
@@ -1244,6 +1558,7 @@ export class GameScene extends Phaser.Scene {
       proj.setDepth(DEPTH_LAYERS.VFX - 10);
       proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
       proj.kind = 'dagger';
+      proj.evolved = evo;
       proj.damage = dmg;
       proj.pierce = pierce;
       proj.life = 1.15;
@@ -1260,13 +1575,14 @@ export class GameScene extends Phaser.Scene {
   _fireArcaneOrbs(level) {
     if (this.activeEnemies.length === 0) return;
 
+    const evo = Boolean(this.evolvedWeapons?.orb);
     const counts = [0, 1, 1, 2, 2, 3];
-    const count = counts[level];
+    const count = evo ? 4 : counts[level];
     const targets = this._getNearestActiveEnemies(540 * 540, count);
     if (targets.length === 0) return;
 
-    const dmg = Math.round((22 + level * 10) * this.stats.mightMult);
-    const blastRadius = (48 + level * 9) * this.stats.areaMult;
+    const dmg = Math.round((22 + level * 10) * (evo ? 1.38 : 1) * this.stats.mightMult);
+    const blastRadius = (48 + level * 9) * this.stats.areaMult * (evo ? 1.35 : 1);
     const speed = 235 + level * 15;
 
     audio.playAuraPulse();
@@ -1278,13 +1594,15 @@ export class GameScene extends Phaser.Scene {
       if (!proj) break;
 
       proj.setTexture('orb_proj');
+      proj.clearTint();
       proj.enableBody(true, this.hero.x, this.hero.y, true, true);
-      proj.baseScale = this.hdMode ? 0.31 : 1.15;
+      proj.baseScale = (this.hdMode ? 0.31 : 1.15) * (evo ? 1.25 : 1);
       proj.setScale(proj.baseScale);
       proj.setRotation(0);
       proj.setDepth(DEPTH_LAYERS.VFX - 8);
       proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
       proj.kind = 'orb';
+      proj.evolved = evo;
       proj.damage = dmg;
       proj.blastRadius = blastRadius;
       proj.pierce = 1;
@@ -1299,6 +1617,40 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  _fireSeismicHammer(level) {
+    const evo = Boolean(this.evolvedWeapons?.hammer);
+    const waveCounts = [0, 1, 1, 2, 2, 3];
+    const waves = evo ? 3 : waveCounts[level];
+    const baseRadius = (72 + level * 13 + (evo ? 24 : 0)) * this.stats.areaMult;
+    const dmg = Math.round((24 + level * 11) * (evo ? 1.45 : 1) * this.stats.mightMult);
+    const hx = this.hero.x;
+    const hy = this.hero.y + 8;
+
+    audio.playHammerSlam();
+    this.cameras.main.shake(110, evo ? 0.006 : 0.0038);
+
+    for (let w = 0; w < waves; w++) {
+      const r = baseRadius * (1 + w * 0.28);
+      const rSq = r * r;
+      const ringCol = evo ? 0xfbbf24 : 0xfb923c;
+      this.activeExplosions.push({ x: hx, y: hy, maxR: r, life: -w * 0.08, dur: 0.32, color: ringCol });
+      this._emitSparks(hx, hy, 8, ringCol, 150);
+
+      for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
+        const e = this.activeEnemies[i];
+        if (!e.active) continue;
+        const dx = e.x - hx;
+        const dy = e.y - hy;
+        if (dx * dx + dy * dy <= rSq) {
+          const isCrit = evo && Math.random() < 0.3;
+          const finalDmg = isCrit ? Math.round(dmg * 1.65) : dmg;
+          this._damageEnemy(e, finalDmg, dx, dy, e.isBoss ? 20 : 175, isCrit, ringCol);
+        }
+      }
+      this._damageCratesInRadius(hx, hy, r);
+    }
+  }
+
   _castLightningStrikes(level) {
     const visible = this.activeEnemies.filter((e) => {
       if (!e.active) return false;
@@ -1306,11 +1658,12 @@ export class GameScene extends Phaser.Scene {
     });
     if (visible.length === 0) return;
 
+    const evo = Boolean(this.evolvedWeapons?.lightning);
     const strikeCounts = [0, 1, 2, 2, 3, 4];
-    const count = strikeCounts[level];
-    const aoeRadius = (48 + level * 8) * this.stats.areaMult;
+    const count = evo ? 5 : strikeCounts[level];
+    const aoeRadius = (48 + level * 8) * this.stats.areaMult * (evo ? 1.25 : 1);
     const aoeSq = aoeRadius * aoeRadius;
-    const dmg = Math.round((30 + level * 15) * this.stats.mightMult);
+    const dmg = Math.round((30 + level * 15) * (evo ? 1.35 : 1) * this.stats.mightMult);
 
     audio.playLightning();
     this.cameras.main.shake(105, 0.0045);
@@ -1322,7 +1675,6 @@ export class GameScene extends Phaser.Scene {
       const tx = pick.x;
       const ty = pick.y;
 
-      // Genera percorso biforcuto persistente per 260ms in _updateVfx
       const points = [
         { x: tx + (Math.random() - 0.5) * 38, y: ty - 290 },
         { x: tx + (Math.random() - 0.5) * 26, y: ty - 200 },
@@ -1347,6 +1699,21 @@ export class GameScene extends Phaser.Scene {
         const dy = e.y - ty;
         if (dx * dx + dy * dy <= aoeSq) {
           this._damageEnemy(e, dmg, dx, dy, 105, true, 0x38bdf8);
+        }
+      }
+
+      if (evo && visible.length > 1) {
+        const chain = visible[(Math.floor(Math.random() * visible.length))];
+        if (chain && chain.active && chain !== pick) {
+          this.activeLightnings.push({
+            x: chain.x,
+            y: chain.y,
+            radius: aoeRadius * 0.75,
+            points: [{ x: tx, y: ty }, { x: (tx + chain.x) / 2, y: (ty + chain.y) / 2 - 18 }, { x: chain.x, y: chain.y }],
+            life: 0,
+            dur: 0.22
+          });
+          this._damageEnemy(chain, Math.round(dmg * 0.7), chain.x - tx, chain.y - ty, 90, true, 0xfbbf24);
         }
       }
     }
@@ -1376,16 +1743,28 @@ export class GameScene extends Phaser.Scene {
           this._damageEnemy(e, dmg, dx, dy, 95, isCrit, 0x38bdf8);
         }
       }
+      if (proj.evolved) {
+        for (let m = 0; m < 3; m++) {
+          const ang = (m * Math.PI * 2) / 3 + 0.4;
+          const sx = ex + Math.cos(ang) * 46;
+          const sy = ey + Math.sin(ang) * 46;
+          this.activeExplosions.push({ x: sx, y: sy, maxR: r * 0.55, life: -0.06, dur: 0.26, color: 0xbae6fd });
+        }
+      }
       this._recycleProjectile(proj);
       return;
     }
 
-    const critBonus = proj.kind === 'dagger' ? 0.12 : 0;
+    const critBonus = (proj.kind === 'dagger' ? 0.12 : 0) + (proj.evolved ? 0.12 : 0);
     const isCrit = Math.random() < (this.stats.critChance || 0.18) + critBonus;
     const critMult = proj.kind === 'dagger' ? 1.85 : 1.65;
     const finalDmg = isCrit ? Math.round(proj.damage * critMult) : proj.damage;
     const sparkColor = proj.kind === 'dagger' ? 0xe879f9 : 0xfbbf24;
     this._damageEnemy(enemy, finalDmg, proj.body.velocity.x, proj.body.velocity.y, 130, isCrit, sparkColor);
+
+    if (proj.kind === 'axe' && proj.evolved) {
+      this.activeExplosions.push({ x: enemy.x, y: enemy.y, maxR: 46, life: 0, dur: 0.22, color: 0xfbbf24 });
+    }
 
     proj.pierce -= 1;
     if (proj.pierce <= 0) {
@@ -1400,7 +1779,7 @@ export class GameScene extends Phaser.Scene {
     enemy.setTintFill(0xffffff);
     enemy.flashTimer = 0.08;
 
-    const kbFactor = enemy.isBoss ? 0.08 : enemy.archetype === 'tank' ? 0.42 : 1;
+    const kbFactor = enemy.isBoss ? 0.08 : enemy.isMiniBoss ? 0.22 : enemy.archetype === 'tank' ? 0.42 : 1;
     const len = Math.hypot(dirX, dirY) || 1;
     if (knockbackForce > 0 && kbFactor > 0) {
       enemy.setVelocity((dirX / len) * knockbackForce * kbFactor, (dirY / len) * knockbackForce * kbFactor);
@@ -1421,6 +1800,12 @@ export class GameScene extends Phaser.Scene {
         hp: Math.max(0, enemy.hp),
         maxHp: enemy.maxHp
       });
+    } else if (enemy.isMiniBoss && !this.bossSpawned) {
+      this.bridge?.onBossHudUpdate?.({
+        name: enemy.displayName || 'Campione Elite',
+        hp: Math.max(0, enemy.hp),
+        maxHp: enemy.maxHp
+      });
     }
 
     if (enemy.hp <= 0) {
@@ -1433,12 +1818,22 @@ export class GameScene extends Phaser.Scene {
     const ey = enemy.y;
     const xpVal = enemy.xpValue || 2;
     const wasBoss = enemy.isBoss;
-    const burstColor = enemy.archetype === 'fast' ? 0x818cf8 : enemy.archetype === 'tank' ? 0xf87171 : 0x38bdf8;
+    const wasMiniBoss = enemy.isMiniBoss;
+    const burstColor = enemy.archetype === 'fast' ? 0x818cf8 : enemy.archetype === 'tank' ? 0xf87171 : enemy.archetype === 'elite' ? 0xfbbf24 : 0x38bdf8;
 
-    this._emitSparks(ex, ey, wasBoss ? 28 : 8, burstColor, wasBoss ? 210 : 110);
+    this._emitSparks(ex, ey, wasBoss ? 28 : wasMiniBoss ? 18 : 8, burstColor, wasBoss ? 210 : 120);
     this.kills += 1;
     this._recycleEnemy(enemy);
     this._spawnXpGem(ex, ey, xpVal);
+
+    if (wasMiniBoss) {
+      this.miniBossesSlain += 1;
+      if (this.activeMiniBoss === enemy) {
+        this.activeMiniBoss = null;
+        if (!this.bossSpawned) this.bridge?.onBossHudUpdate?.(null);
+      }
+      this._spawnPickup(ex, ey, 'chest');
+    }
 
     if (wasBoss && !this.bossDefeated) {
       this._onBossDefeated();
@@ -1474,14 +1869,20 @@ export class GameScene extends Phaser.Scene {
       elapsedSec: Math.floor(this.elapsedSec),
       kills: this.kills,
       level: this.stats.level,
-      bossDefeated: true
+      bossDefeated: true,
+      miniBossesSlain: this.miniBossesSlain,
+      cratesBroken: this.cratesBroken,
+      shrinesActivated: this.shrinesActivated,
+      evolutionsForged: this.evolutionsForged
     });
   }
 
   _onEnemyTouchHero(enemy) {
     if (this.stats.invulnTimer > 0) return;
 
-    this.stats.hp = Math.max(0, this.stats.hp - (enemy.damage || 10));
+    const shieldMult = this.activeBuff?.id === 'frost_shield' ? 0.55 : 1;
+    const dmg = Math.max(1, Math.round((enemy.damage || 10) * shieldMult));
+    this.stats.hp = Math.max(0, this.stats.hp - dmg);
     this.stats.invulnTimer = 0.48;
     audio.playPlayerHurt();
     this.cameras.main.shake(120, 0.006);
@@ -1515,7 +1916,11 @@ export class GameScene extends Phaser.Scene {
       elapsedSec: Math.floor(this.elapsedSec),
       kills: this.kills,
       level: this.stats.level,
-      bossDefeated: this.bossDefeated
+      bossDefeated: this.bossDefeated,
+      miniBossesSlain: this.miniBossesSlain,
+      cratesBroken: this.cratesBroken,
+      shrinesActivated: this.shrinesActivated,
+      evolutionsForged: this.evolutionsForged
     });
   }
 
@@ -1538,20 +1943,72 @@ export class GameScene extends Phaser.Scene {
       const dy = hy - e.y;
       const dSq = dx * dx + dy * dy;
 
-      if (!e.isBoss && dSq > recycleDistSq) {
+      if (!e.isBoss && !e.isMiniBoss && dSq > recycleDistSq) {
         const ang = Math.random() * Math.PI * 2;
         e.setPosition(hx + Math.cos(ang) * 380, hy + Math.sin(ang) * 380);
       }
 
       if (e.knockbackTimer > 0) {
         e.knockbackTimer -= dt;
+      } else if (e.archetype === 'archer') {
+        const dist = Math.sqrt(dSq) || 1;
+        e.setFlipX(dx < 0);
+        if (e.archerWindup > 0) {
+          e.archerWindup -= dt;
+          e.setVelocity(0, 0);
+          if (e.archerWindup <= 0) {
+            e.clearTint();
+            this._fireEnemyFrostArrow(e, hx, hy);
+            e.archerCooldown = 2.4;
+          }
+        } else {
+          if (dist > 235) {
+            e.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
+          } else if (dist < 155) {
+            e.setVelocity(-(dx / dist) * e.speed * 0.75, -(dy / dist) * e.speed * 0.75);
+          } else {
+            e.setVelocity((-dy / dist) * e.speed * 0.45, (dx / dist) * e.speed * 0.45);
+          }
+          e.archerCooldown -= dt;
+          if (e.archerCooldown <= 0 && dist <= 280) {
+            e.archerWindup = 0.42;
+            e.setTintFill(0x7dd3fc);
+          }
+        }
+      } else if (e.archetype === 'berserker') {
+        const dist = Math.sqrt(dSq) || 1;
+        if (e.chargeTime > 0) {
+          e.chargeTime -= dt;
+          e.setVelocity(e.chargeVx, e.chargeVy);
+          if (e.chargeTime <= 0) e.clearTint();
+        } else if (e.chargeWindup > 0) {
+          e.chargeWindup -= dt;
+          e.setVelocity(0, 0);
+          if (e.chargeWindup <= 0) {
+            e.chargeTime = 0.55;
+            e.chargeVx = (dx / dist) * 215;
+            e.chargeVy = (dy / dist) * 215;
+          }
+        } else {
+          e.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
+          e.setFlipX(dx < 0);
+          e.chargeCooldown -= dt;
+          if (e.chargeCooldown <= 0 && dist < 210 && dist > 55) {
+            e.chargeWindup = 0.45;
+            e.chargeCooldown = 3.8;
+            e.setTintFill(0xf87171);
+          }
+        }
       } else {
         const dist = Math.sqrt(dSq) || 1;
         e.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
         e.setFlipX(dx < 0);
       }
 
-      e.walkPhase += dt * (e.isBoss ? 6 : 11);
+      e.walkPhase += dt * (e.isBoss ? 5.5 : 8.5);
+      if (e.baseTexKey) {
+        this._applyWalkTextureFrame(e, e.baseTexKey, e.walkPhase);
+      }
       const baseScale =
         e.baseScale ||
         (e.isBoss
@@ -1559,13 +2016,12 @@ export class GameScene extends Phaser.Scene {
           : e.archetype === 'tank'
             ? this.hdMode ? 0.363 : 1.34
             : this.hdMode ? 0.322 : 1.19);
-      const wobble = Math.sin(e.walkPhase);
-      e.setScale(baseScale * (1 - wobble * 0.045), baseScale * (1 + wobble * 0.055));
+      const wobble = Math.sin(e.walkPhase * 1.4);
+      e.setScale(baseScale * (1 - wobble * 0.03), baseScale * (1 + wobble * 0.04));
 
-      // Y-Sorting sicuro anche a coordinate Y negative
       e.setDepth(computeEntityDepth(e.y));
       if (e.shadow) {
-        e.shadow.setPosition(e.x, e.y + (e.isBoss ? 37 : e.archetype === 'tank' ? 23 : 15));
+        e.shadow.setPosition(e.x, e.y + (e.isBoss ? 37 : e.isMiniBoss ? 28 : e.archetype === 'tank' ? 23 : 15));
       }
     }
 
@@ -1645,6 +2101,46 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  _fireEnemyFrostArrow(archer, targetX, targetY) {
+    const proj = this.enemyProjPool.get(archer.x, archer.y, 'frost_arrow');
+    if (!proj) return;
+    const ang = Math.atan2(targetY - archer.y, targetX - archer.x);
+    const speed = 185;
+    proj.setTexture('frost_arrow');
+    proj.enableBody(true, archer.x, archer.y, true, true);
+    proj.setScale(this.hdMode ? 0.36 : 1.1);
+    proj.setRotation(ang);
+    proj.setDepth(DEPTH_LAYERS.VFX - 5);
+    proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
+    proj.life = 2.6;
+    proj.damage = archer.damage || 11;
+    if (!this.activeEnemyProjectiles.includes(proj)) {
+      this.activeEnemyProjectiles.push(proj);
+    }
+  }
+
+  _updateEnemyProjectiles(dt) {
+    const hx = this.hero.x;
+    const hy = this.hero.y;
+    const hitSq = 15 * 15;
+    for (let i = this.activeEnemyProjectiles.length - 1; i >= 0; i--) {
+      const ep = this.activeEnemyProjectiles[i];
+      if (!ep.active) continue;
+      ep.life -= dt;
+      ep.setDepth(computeEntityDepth(ep.y) + 15);
+      if (computeSquaredDistance(hx, hy, ep.x, ep.y) <= hitSq) {
+        this._onEnemyTouchHero({ damage: ep.damage || 11 });
+        ep.disableBody(true, true);
+        this.activeEnemyProjectiles.splice(i, 1);
+        continue;
+      }
+      if (ep.life <= 0) {
+        ep.disableBody(true, true);
+        this.activeEnemyProjectiles.splice(i, 1);
+      }
+    }
+  }
+
   _updateProjectiles(dt) {
     for (let i = this.activeProjectiles.length - 1; i >= 0; i--) {
       const p = this.activeProjectiles[i];
@@ -1658,6 +2154,12 @@ export class GameScene extends Phaser.Scene {
         p.setScale(pulse);
       }
       p.setDepth(computeEntityDepth(p.y) + 25);
+
+      if (this._damageCratesInRadius(p.x, p.y, 26) && p.kind === 'orb') {
+        this.activeExplosions.push({ x: p.x, y: p.y, maxR: p.blastRadius || 48, life: 0, dur: 0.25, color: 0x38bdf8 });
+        this._recycleProjectile(p);
+        continue;
+      }
 
       p.trailTimer -= dt;
       if (p.trailTimer <= 0) {
@@ -1678,7 +2180,7 @@ export class GameScene extends Phaser.Scene {
   _updateVfx(dt) {
     this.vfxGfx.clear();
 
-    // 1. Onde espansive Aura del Crepuscolo
+    // 1. Onde espansive Aura del Crepuscolo & Martello Sismico
     for (let i = this.activeAuraPulses.length - 1; i >= 0; i--) {
       const p = this.activeAuraPulses[i];
       p.life += dt;
@@ -1688,7 +2190,7 @@ export class GameScene extends Phaser.Scene {
         continue;
       }
       const r = p.maxR * (0.45 + t * 0.65);
-      this.vfxGfx.lineStyle(2.5, 0xe879f9, (1 - t) * 0.75);
+      this.vfxGfx.lineStyle(2.5, p.color || 0xe879f9, (1 - t) * 0.75);
       this.vfxGfx.strokeCircle(p.x, p.y, r);
     }
 
@@ -1920,18 +2422,37 @@ export class GameScene extends Phaser.Scene {
     this._resetJoystick();
     audio.playLevelUp();
 
+    const evos = this._getAvailableEvolutions();
     const available = UPGRADE_CATALOG.filter((u) => this.levels[u.id] < u.maxLevel);
     Phaser.Utils.Array.Shuffle(available);
-    const choices = available.slice(0, 3).map((u) => {
+
+    const choices = [];
+    if (evos.length > 0) {
+      const evo = evos[0];
+      choices.push({
+        id: evo.id,
+        weaponId: evo.weaponId,
+        type: 'evolution',
+        isEvolution: true,
+        name: evo.name,
+        accent: evo.accent,
+        currentLevel: 5,
+        nextLevel: 'MAX',
+        description: evo.description
+      });
+    }
+
+    for (const u of available) {
+      if (choices.length >= 3) break;
       const currentLv = this.levels[u.id];
       const nextLv = currentLv + 1;
-      return {
+      choices.push({
         ...u,
         currentLevel: currentLv,
         nextLevel: nextLv,
         description: u.desc[nextLv - 1] || u.desc[u.desc.length - 1]
-      };
-    });
+      });
+    }
 
     if (choices.length === 0) {
       this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 30);
@@ -1941,6 +2462,270 @@ export class GameScene extends Phaser.Scene {
 
     this._syncHud();
     this.bridge?.onLevelUp?.(choices);
+  }
+
+  _initWorldInteractables() {
+    for (let i = 0; i < 6; i++) {
+      const crate = this.add.image(0, 0, 'prop_crate').setScale(this.hdMode ? 0.42 : 1.05);
+      crate.activeCrate = true;
+      crate.respawnTimer = 0;
+      this.crateItems.push(crate);
+    }
+    for (let i = 0; i < 2; i++) {
+      const shrine = this.add.image(0, 0, 'prop_shrine').setScale(this.hdMode ? 0.43 : 1.1);
+      shrine.charge = 0;
+      shrine.cooldown = 0;
+      this.shrineItems.push(shrine);
+    }
+    for (let i = 0; i < 12; i++) {
+      const pk = this.add.image(0, 0, 'chest_valhalla').setVisible(false).setDepth(DEPTH_LAYERS.GEMS + 5);
+      pk.active = false;
+      pk.kind = 'chest';
+      this.pickupItems.push(pk);
+    }
+  }
+
+  _repositionCratesAndShrines() {
+    for (let i = 0; i < this.crateItems.length; i++) {
+      const c = this.crateItems[i];
+      const ang = (i / this.crateItems.length) * Math.PI * 2 + 0.3;
+      const dist = 160 + (i % 3) * 110;
+      c.setPosition(Math.cos(ang) * dist, Math.sin(ang) * dist);
+      c.setDepth(computeEntityDepth(c.y));
+      c.activeCrate = true;
+      c.respawnTimer = 0;
+      c.setVisible(true);
+    }
+    for (let i = 0; i < this.shrineItems.length; i++) {
+      const s = this.shrineItems[i];
+      const ang = i === 0 ? -Math.PI * 0.45 : Math.PI * 0.65;
+      const dist = 240 + i * 110;
+      s.setPosition(Math.cos(ang) * dist, Math.sin(ang) * dist);
+      s.setDepth(computeEntityDepth(s.y));
+      s.charge = 0;
+      s.cooldown = 0;
+      s.setAlpha(1);
+    }
+  }
+
+  _damageCratesInRadius(x, y, radius) {
+    if (!this.crateItems || this.crateItems.length === 0) return false;
+    const rSq = (radius + 14) * (radius + 14);
+    let broke = false;
+    for (let i = 0; i < this.crateItems.length; i++) {
+      const c = this.crateItems[i];
+      if (!c.activeCrate) continue;
+      if (computeSquaredDistance(x, y, c.x, c.y) <= rSq) {
+        c.activeCrate = false;
+        c.respawnTimer = 9.0;
+        c.setVisible(false);
+        this.cratesBroken += 1;
+        audio.playCrateBreak();
+        this._emitSparks(c.x, c.y, 10, 0xfbbf24, 130);
+        const roll = Math.random();
+        if (roll < 0.45) {
+          this._spawnPickup(c.x, c.y, 'meat');
+        } else if (roll < 0.7) {
+          this._spawnPickup(c.x, c.y, 'magnet');
+        } else {
+          this._spawnXpGem(c.x, c.y, 18);
+        }
+        broke = true;
+      }
+    }
+    return broke;
+  }
+
+  _updateCratesAndShrines(dt) {
+    const hx = this.hero.x;
+    const hy = this.hero.y;
+    const maxRSq = GAME_CONFIG.PROP_RECYCLE_RADIUS * GAME_CONFIG.PROP_RECYCLE_RADIUS;
+
+    for (let i = 0; i < this.crateItems.length; i++) {
+      const c = this.crateItems[i];
+      if (!c.activeCrate) {
+        c.respawnTimer -= dt;
+        if (c.respawnTimer <= 0) {
+          const ang = Math.random() * Math.PI * 2;
+          const dist = 280 + Math.random() * 240;
+          c.setPosition(hx + Math.cos(ang) * dist, hy + Math.sin(ang) * dist);
+          c.setDepth(computeEntityDepth(c.y));
+          c.activeCrate = true;
+          c.setVisible(true);
+        }
+      } else if (computeSquaredDistance(hx, hy, c.x, c.y) > maxRSq) {
+        const ang = Math.atan2(hy - c.y, hx - c.x) + (Math.random() - 0.5) * 1.2;
+        const dist = GAME_CONFIG.PROP_RECYCLE_RADIUS - 90;
+        c.setPosition(hx + Math.cos(ang) * dist, hy + Math.sin(ang) * dist);
+        c.setDepth(computeEntityDepth(c.y));
+      }
+    }
+
+    const shrineRadius = 54;
+    const shrineRSq = shrineRadius * shrineRadius;
+    for (let i = 0; i < this.shrineItems.length; i++) {
+      const s = this.shrineItems[i];
+      if (computeSquaredDistance(hx, hy, s.x, s.y) > maxRSq) {
+        const ang = Math.atan2(hy - s.y, hx - s.x) + (Math.random() - 0.5) * 1.2;
+        const dist = GAME_CONFIG.PROP_RECYCLE_RADIUS - 110;
+        s.setPosition(hx + Math.cos(ang) * dist, hy + Math.sin(ang) * dist);
+        s.setDepth(computeEntityDepth(s.y));
+        s.charge = 0;
+        s.cooldown = 0;
+        s.setAlpha(1);
+      }
+
+      if (s.cooldown > 0) {
+        s.cooldown -= dt;
+        if (s.cooldown <= 0) s.setAlpha(1);
+        continue;
+      }
+
+      const sy = s.y + 12;
+      this.auraGfx.lineStyle(2, 0x38bdf8, 0.55);
+      this.auraGfx.strokeCircle(s.x, sy, shrineRadius);
+
+      if (computeSquaredDistance(hx, hy, s.x, sy) <= shrineRSq) {
+        s.charge = Math.min(1.5, s.charge + dt);
+        const pct = s.charge / 1.5;
+        this.auraGfx.fillStyle(0x38bdf8, 0.12 + pct * 0.22);
+        this.auraGfx.fillCircle(s.x, sy, shrineRadius * pct);
+        if (s.charge >= 1.5) {
+          this._activateShrine(s);
+        }
+      } else if (s.charge > 0) {
+        s.charge = Math.max(0, s.charge - dt * 0.6);
+      }
+    }
+  }
+
+  _activateShrine(shrine) {
+    shrine.charge = 0;
+    shrine.cooldown = 28;
+    shrine.setAlpha(0.45);
+    this.shrinesActivated += 1;
+    audio.playShrineActivate();
+    this._emitSparks(shrine.x, shrine.y, 18, 0x38bdf8, 160);
+
+    const roll = Math.random();
+    if (roll < 0.36) {
+      this.activeBuff = { id: 'fury', label: 'Furia Runica +35% Danno', accent: '#f59e0b', remaining: 15 };
+    } else if (roll < 0.72) {
+      this.activeBuff = { id: 'frost_shield', label: 'Egida del Gelo · Scudo & Vel.', accent: '#38bdf8', remaining: 15 };
+    } else {
+      const heal = Math.round(this.stats.maxHp * 0.4);
+      this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + heal);
+      this.activeExplosions.push({ x: this.hero.x, y: this.hero.y, maxR: 130, life: 0, dur: 0.34, color: 0x34d399 });
+      this.activeBuff = { id: 'fury', label: `Benedizione +${heal} HP & Furia`, accent: '#34d399', remaining: 10 };
+    }
+    this._recomputeStatsFromLevels();
+    this._syncHud();
+  }
+
+  _spawnPickup(x, y, kind) {
+    const slot = this.pickupItems.find((p) => !p.active);
+    if (!slot) return null;
+    const texMap = { chest: 'chest_valhalla', meat: 'meat_pickup', magnet: 'magnet_pickup' };
+    slot.setTexture(texMap[kind] || 'chest_valhalla');
+    slot.setPosition(x, y);
+    slot.setScale(this.hdMode ? (kind === 'chest' ? 0.42 : 0.45) : 1.05);
+    slot.setDepth(computeEntityDepth(y) - 10);
+    slot.kind = kind;
+    slot.active = true;
+    slot.setVisible(true);
+    return slot;
+  }
+
+  _updatePickups(_dt) {
+    const hx = this.hero.x;
+    const hy = this.hero.y;
+    const pickupSq = 28 * 28;
+    for (let i = 0; i < this.pickupItems.length; i++) {
+      const pk = this.pickupItems[i];
+      if (!pk.active) continue;
+      if (computeSquaredDistance(hx, hy, pk.x, pk.y) <= pickupSq) {
+        const kind = pk.kind;
+        pk.active = false;
+        pk.setVisible(false);
+        if (kind === 'chest') {
+          this._openChestReward();
+          return;
+        } else if (kind === 'meat') {
+          this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 25);
+          audio.playGem(6);
+          this._emitSparks(hx, hy, 10, 0x34d399, 100);
+        } else if (kind === 'magnet') {
+          audio.playShrineActivate();
+          for (const g of this.activeGems) {
+            if (g.active) g.magnetized = true;
+          }
+          this._emitSparks(hx, hy, 12, 0x38bdf8, 120);
+        }
+      }
+    }
+  }
+
+  _openChestReward() {
+    this.gameState = 'CHEST';
+    this.physics.pause();
+    this._resetJoystick();
+    audio.playChestOpen();
+
+    let reward = null;
+    const evos = this._getAvailableEvolutions();
+    if (evos.length > 0) {
+      const evo = evos[0];
+      this.evolvedWeapons[evo.weaponId] = true;
+      this.evolutionsForged += 1;
+      audio.playEvolution();
+      if (evo.weaponId === 'blades') {
+        this._rebuildValkyrieBlades();
+      }
+      reward = {
+        isEvolution: true,
+        iconId: evo.weaponId,
+        title: evo.name,
+        subtitle: evo.description,
+        accent: evo.accent,
+        tag: 'EVOLUZIONE LEGGENDARIA'
+      };
+    } else {
+      const upgradable = UPGRADE_CATALOG.filter((u) => this.levels[u.id] < u.maxLevel);
+      if (upgradable.length > 0) {
+        const owned = upgradable.filter((u) => this.levels[u.id] > 0);
+        const pickPool = owned.length > 0 ? owned : upgradable;
+        const pick = pickPool[Math.floor(Math.random() * pickPool.length)];
+        this.levels[pick.id] += 1;
+        this._recomputeStatsFromLevels();
+        if (pick.id === 'blades') this._rebuildValkyrieBlades();
+        const lv = this.levels[pick.id];
+        reward = {
+          isEvolution: false,
+          iconId: pick.id,
+          title: pick.name,
+          subtitle: pick.desc[lv - 1] || pick.desc[0],
+          accent: pick.accent,
+          tag: `POTENZIAMENTO · LV ${lv}`
+        };
+      } else {
+        this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + 40);
+        reward = {
+          isEvolution: false,
+          iconId: 'regen',
+          title: 'Dono del Valhalla',
+          subtitle: 'Tutte le armi sono al massimo: +40 HP recuperati!',
+          accent: '#34d399',
+          tag: 'TESORO'
+        };
+      }
+    }
+
+    this._syncHud();
+    if (this.bridge?.onChestOpened) {
+      this.bridge.onChestOpened(reward);
+    } else {
+      this.resumeGame();
+    }
   }
 
   _recycleEnemy(enemy) {
@@ -2201,6 +2986,7 @@ export class GameScene extends Phaser.Scene {
       elapsedSec: Math.floor(this.elapsedSec),
       remainingSec: Math.max(0, Math.ceil(GAME_CONFIG.RUN_DURATION_SEC - this.elapsedSec)),
       bossSpawned: this.bossSpawned,
+      buff: this.activeBuff ? { ...this.activeBuff } : null,
       build: this._getBuildSnapshot()
     });
   }
@@ -2464,6 +3250,34 @@ export class GameScene extends Phaser.Scene {
       g.generateTexture('hero_mage', 36, 42);
     }
 
+    // 2d. Eroe 4: Bjorn Martello di Ferro (36x42)
+    if (!this.textures.exists('hero_juggernaut')) {
+      g.clear();
+      g.fillStyle(0x451a03, 1);
+      g.fillRect(6, 15, 24, 18);
+      g.fillStyle(0x1e293b, 1);
+      g.fillRect(9, 14, 18, 15);
+      g.fillStyle(0xfb923c, 1);
+      g.fillRect(10, 24, 16, 3);
+      g.fillStyle(0x0f172a, 1);
+      g.fillRect(9, 29, 7, 10);
+      g.fillRect(20, 29, 7, 10);
+      g.fillStyle(0xfdba74, 1);
+      g.fillRect(13, 8, 10, 8);
+      g.fillStyle(0xc2410c, 1);
+      g.fillRect(13, 12, 10, 5);
+      g.fillStyle(0x334155, 1);
+      g.fillRect(11, 4, 14, 5);
+      g.fillStyle(0xfef3c7, 1);
+      g.fillRect(7, 2, 4, 5);
+      g.fillRect(25, 2, 4, 5);
+      g.fillStyle(0x78350f, 1);
+      g.fillRect(28, 12, 3, 18);
+      g.fillStyle(0x64748b, 1);
+      g.fillRect(25, 6, 9, 7);
+      g.generateTexture('hero_juggernaut', 36, 42);
+    }
+
     // 3. Nemico Swarm: Draugr (30x34)
     if (!this.textures.exists('enemy_swarm')) {
       g.clear();
@@ -2521,6 +3335,38 @@ export class GameScene extends Phaser.Scene {
       g.fillRect(10, 36, 7, 9);
       g.fillRect(23, 36, 7, 9);
       g.generateTexture('enemy_tank', 40, 46);
+    }
+
+    // 5b. Arciere di Brina (30x34), Berserker (36x40), Elite (46x52)
+    if (!this.textures.exists('enemy_archer')) {
+      g.clear();
+      g.fillStyle(0x0369a1, 1);
+      g.fillRect(8, 12, 14, 15);
+      g.fillStyle(0x075985, 1);
+      g.fillRect(9, 3, 12, 10);
+      g.fillStyle(0x38bdf8, 1);
+      g.fillRect(23, 8, 3, 16);
+      g.generateTexture('enemy_archer', 30, 34);
+    }
+    if (!this.textures.exists('enemy_berserker')) {
+      g.clear();
+      g.fillStyle(0x991b1b, 1);
+      g.fillRect(8, 13, 20, 17);
+      g.fillStyle(0x292524, 1);
+      g.fillRect(12, 4, 12, 10);
+      g.fillStyle(0xef4444, 1);
+      g.fillRect(14, 8, 2, 2);
+      g.fillRect(20, 8, 2, 2);
+      g.generateTexture('enemy_berserker', 36, 40);
+    }
+    if (!this.textures.exists('enemy_elite')) {
+      g.clear();
+      g.fillStyle(0x1e293b, 1);
+      g.fillRect(9, 15, 28, 24);
+      g.fillStyle(0xfbbf24, 1);
+      g.fillRect(14, 4, 18, 11);
+      g.fillRect(20, 22, 6, 8);
+      g.generateTexture('enemy_elite', 46, 52);
     }
 
     // 6. Boss Finale: Hrimthurs (70x80)
@@ -2661,6 +3507,50 @@ export class GameScene extends Phaser.Scene {
     drawGem('gem_blue', 0x0ea5e9, 0xbae6fd);
     drawGem('gem_green', 0x10b981, 0xa7f3d0);
     drawGem('gem_gold', 0xf59e0b, 0xfef3c7);
+
+    // 14. Casse, Altari, Forziere, Freccia di Brina e Pickup
+    if (!this.textures.exists('prop_crate')) {
+      g.clear();
+      g.fillStyle(0x78350f, 1);
+      g.fillRect(3, 4, 18, 16);
+      g.fillStyle(0xfbbf24, 1);
+      g.fillRect(11, 8, 2, 8);
+      g.generateTexture('prop_crate', 24, 24);
+    }
+    if (!this.textures.exists('prop_shrine')) {
+      g.clear();
+      g.fillStyle(0x475569, 1);
+      g.fillRect(8, 6, 16, 28);
+      g.fillStyle(0x38bdf8, 1);
+      g.fillRect(14, 12, 4, 14);
+      g.generateTexture('prop_shrine', 32, 38);
+    }
+    if (!this.textures.exists('chest_valhalla')) {
+      g.clear();
+      g.fillStyle(0xb45309, 1);
+      g.fillRect(3, 6, 18, 12);
+      g.fillStyle(0xfbbf24, 1);
+      g.fillRect(3, 4, 18, 4);
+      g.generateTexture('chest_valhalla', 24, 20);
+    }
+    if (!this.textures.exists('frost_arrow')) {
+      g.clear();
+      g.fillStyle(0x7dd3fc, 1);
+      g.fillRect(1, 3, 14, 2);
+      g.generateTexture('frost_arrow', 16, 8);
+    }
+    if (!this.textures.exists('meat_pickup')) {
+      g.clear();
+      g.fillStyle(0xef4444, 1);
+      g.fillRect(2, 3, 10, 8);
+      g.generateTexture('meat_pickup', 16, 14);
+    }
+    if (!this.textures.exists('magnet_pickup')) {
+      g.clear();
+      g.fillStyle(0x38bdf8, 1);
+      g.fillRect(3, 3, 10, 10);
+      g.generateTexture('magnet_pickup', 16, 16);
+    }
 
     g.destroy();
   }

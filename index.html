@@ -233,6 +233,28 @@
         display: inline-flex;
       }
 
+      .build-chip.is-evolved {
+        border-color: rgba(251, 191, 36, 0.85) !important;
+        background: rgba(120, 53, 15, 0.55);
+        box-shadow: 0 0 8px rgba(251, 191, 36, 0.25);
+      }
+
+      #hud-buff-bar {
+        position: absolute;
+        top: 112px;
+        left: 12px;
+        max-width: 240px;
+        background: rgba(15, 23, 42, 0.84);
+        border-left: 3px solid var(--frost);
+        border-radius: 6px;
+        padding: 4px 8px;
+        font-family: 'Silkscreen', monospace;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        color: #e0f2fe;
+        backdrop-filter: blur(4px);
+      }
+
       /* Barra Vita Boss Finale */
       #boss-hud {
         position: absolute;
@@ -396,7 +418,7 @@
 
       #hero-selector-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 8px;
       }
 
@@ -611,8 +633,12 @@
 
       .secondary-actions-row {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr 1fr;
         gap: 8px;
+      }
+
+      .secondary-actions-row .btn-install {
+        grid-column: 1 / -1;
       }
 
       /* Blocco EXP Permanente fine partita */
@@ -652,6 +678,14 @@
         font-size: 12px;
         line-height: 1.4;
         color: #bae6fd;
+      }
+
+      #end-codex-unlocks {
+        font-size: 12px;
+        line-height: 1.4;
+        color: #fde68a;
+        border-top: 1px solid rgba(226, 232, 240, 0.08);
+        padding-top: 6px;
       }
 
       .btn-primary {
@@ -792,10 +826,161 @@
         white-space: nowrap;
       }
 
+      .upgrade-card.is-evolution {
+        background: linear-gradient(135deg, rgba(120, 53, 15, 0.62), rgba(30, 41, 59, 0.92));
+        border-color: rgba(251, 191, 36, 0.85);
+        box-shadow: 0 0 18px rgba(245, 158, 11, 0.25);
+      }
+
       .upgrade-desc {
         margin: 0;
         font-size: 12px;
         line-height: 1.4;
+        color: #cbd5e1;
+      }
+
+      /* Modale Forziere del Valhalla */
+      .chest-reward-box {
+        background: rgba(30, 41, 59, 0.72);
+        border: 1px solid rgba(251, 191, 36, 0.45);
+        border-radius: 14px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 8px;
+      }
+
+      .chest-reward-box.is-evolution {
+        background: linear-gradient(160deg, rgba(120, 53, 15, 0.65), rgba(15, 23, 42, 0.92));
+        border-color: rgba(251, 191, 36, 0.9);
+      }
+
+      .chest-icon-frame {
+        width: 56px;
+        height: 56px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(9, 13, 22, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px;
+      }
+
+      .chest-tag {
+        font-family: 'Silkscreen', monospace;
+        font-size: 10px;
+        letter-spacing: 0.06em;
+        color: var(--gold);
+      }
+
+      .chest-title {
+        margin: 0;
+        font-family: 'Cinzel', serif;
+        font-size: 18px;
+        color: var(--text);
+      }
+
+      .chest-desc {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.45;
+        color: #cbd5e1;
+      }
+
+      /* Modale Codex delle Rune */
+      .codex-panel {
+        height: 86dvh;
+      }
+
+      .codex-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .codex-progress {
+        font-family: 'Silkscreen', monospace;
+        font-size: 12px;
+        font-variant-numeric: tabular-nums;
+        color: var(--gold);
+      }
+
+      .codex-tabs {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        flex-shrink: 0;
+      }
+
+      .codex-tab {
+        min-height: 40px;
+        padding: 6px 10px;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        border-radius: 8px 8px 0 0;
+        background: rgba(30, 41, 59, 0.45);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        white-space: nowrap;
+        cursor: pointer;
+      }
+
+      .codex-tab.is-active {
+        color: var(--text);
+        background: rgba(30, 41, 59, 0.9);
+        border-bottom-color: var(--gold);
+      }
+
+      .codex-list {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-right: 2px;
+      }
+
+      .codex-entry {
+        background: rgba(30, 41, 59, 0.65);
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--entry-accent, var(--gold));
+        border-radius: 10px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .codex-entry.is-locked {
+        opacity: 0.72;
+        border-left-color: #475569;
+        background: rgba(15, 23, 42, 0.7);
+      }
+
+      .codex-entry-title {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 14px;
+        color: var(--text);
+      }
+
+      .codex-entry-meta {
+        font-family: 'Silkscreen', monospace;
+        font-size: 10px;
+        color: var(--muted);
+      }
+
+      .codex-entry-body {
+        margin: 2px 0 0;
+        font-size: 12px;
+        line-height: 1.45;
         color: #cbd5e1;
       }
 
@@ -1018,6 +1203,7 @@
           </div>
 
           <div id="hud-build-strip"></div>
+          <div id="hud-buff-bar" class="hidden"></div>
 
           <div id="boss-hud" class="hidden">
             <div class="boss-hud-row">
@@ -1091,6 +1277,7 @@
             <button type="button" id="play-btn" class="btn-primary">GIOCA</button>
             <div class="secondary-actions-row">
               <button type="button" id="title-mute-btn" class="btn-secondary">Audio: Attivo</button>
+              <button type="button" id="codex-btn" class="btn-secondary">Codex Rune</button>
               <button type="button" id="pwa-install-btn" class="btn-install hidden">
                 Installa App su Schermata Home
               </button>
@@ -1104,6 +1291,33 @@
             <h2 class="modal-title">LIVELLO SUPERATO</h2>
             <p class="modal-sub">Scegli una runa o un’arma per potenziare la tua build</p>
             <div id="levelup-cards"></div>
+          </div>
+        </div>
+
+        <!-- Modale Forziere del Valhalla -->
+        <div id="chest-modal" class="modal-backdrop">
+          <div class="modal-panel">
+            <h2 class="modal-title">FORZIERE DEL VALHALLA</h2>
+            <div class="chest-reward-box" id="chest-reward-box">
+              <div class="chest-icon-frame" id="chest-icon"></div>
+              <div class="chest-tag" id="chest-tag">POTENZIAMENTO</div>
+              <h3 class="chest-title" id="chest-title">Ricompensa</h3>
+              <p class="chest-desc" id="chest-desc"></p>
+            </div>
+            <button type="button" id="chest-claim-btn" class="btn-primary">RISCUOTI</button>
+          </div>
+        </div>
+
+        <!-- Modale Codex delle Rune -->
+        <div id="codex-modal" class="modal-backdrop">
+          <div class="modal-panel codex-panel">
+            <div class="codex-header">
+              <h2 class="modal-title" style="text-align:left">CODEX DELLE RUNE</h2>
+              <span id="codex-progress" class="codex-progress">0 / 16</span>
+            </div>
+            <div id="codex-tabs" class="codex-tabs"></div>
+            <div id="codex-list" class="codex-list"></div>
+            <button type="button" id="codex-close-btn" class="btn-secondary">Chiudi</button>
           </div>
         </div>
 
@@ -1149,6 +1363,7 @@
               </div>
               <div id="end-meta-levelup" class="hidden">NUOVO GRADO RAGGIUNTO!</div>
               <div id="end-meta-unlocks" class="hidden"></div>
+              <div id="end-codex-unlocks" class="hidden"></div>
             </div>
             <button type="button" id="play-again-btn" class="btn-primary">GIOCA ANCORA</button>
             <button type="button" id="end-title-btn" class="btn-secondary">Menu Principale</button>
