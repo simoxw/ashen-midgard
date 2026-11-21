@@ -266,9 +266,13 @@ const {
   REALM_STORAGE_KEY,
   REALM_ORDER,
   REALM_CATALOG,
+  CHALLENGE_ORDER,
+  REALM_CHALLENGES,
   getRealmConfig,
+  getChallengeConfig,
   getRealmDialogue,
   loadRealmProgress,
+  saveRealmProgress,
   recordRealmVictory
 } = await import('../src/realms.js');
 
@@ -546,9 +550,11 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
     'prop_tree', 'prop_rock', 'prop_brazier', 'prop_crate', 'prop_shrine',
     'chest_valhalla', 'frost_arrow', 'meat_pickup', 'magnet_pickup', 'shadow_ellipse',
     'axe_proj', 'dagger_proj', 'orb_proj', 'blade_proj',
+    'spear_proj', 'scythe_proj', 'fang_proj', 'grimoire_proj', 'flail_proj',
+    'enemy_shaman', 'enemy_shaman_f1', 'enemy_bomber', 'enemy_shieldbearer', 'enemy_stalker',
     'gem_blue', 'gem_green', 'gem_gold',
-    'ground_tile_muspel', 'enemy_muspel_swarm', 'enemy_muspel_swarm_f1', 'boss_surtr', 'boss_surtr_f2', 'fire_bolt',
-    'ground_tile_hel', 'enemy_hel_swarm', 'enemy_hel_swarm_f1', 'boss_hel', 'boss_hel_f2', 'shadow_bolt'
+    'ground_tile_muspel', 'enemy_muspel_swarm', 'enemy_muspel_swarm_f1', 'enemy_muspel_shaman', 'boss_surtr', 'boss_surtr_f2', 'fire_bolt',
+    'ground_tile_hel', 'enemy_hel_swarm', 'enemy_hel_swarm_f1', 'enemy_hel_stalker', 'boss_hel', 'boss_hel_f2', 'shadow_bolt'
   ]) {
     assert.equal(registered.has(expectedKey), true, `Sprite HD 4x mancante: ${expectedKey}`);
   }
@@ -601,20 +607,24 @@ test('Heroes & Meta-Progression: 4 eroi, armi sbloccabili e EXP permanente', () 
   assert.deepEqual(lv1Perks.unlockedWeapons, ['dagger']);
 
   const lv2Perks = getPerksForHeroLevel('assassin', 2);
-  assert.deepEqual(lv2Perks.unlockedWeapons, ['dagger', 'blades']);
+  assert.deepEqual(lv2Perks.unlockedWeapons, ['dagger', 'scythe']);
   assert.equal(lv2Perks.maxHp, HERO_ROSTER.assassin.baseStats.maxHp + 12);
 
   const lv4Perks = getPerksForHeroLevel('mage', 4);
-  assert.deepEqual(lv4Perks.unlockedWeapons, ['orb', 'lightning', 'aura']);
+  assert.deepEqual(lv4Perks.unlockedWeapons, ['orb', 'lightning', 'grimoire']);
   assert.ok(lv4Perks.mightMult > HERO_ROSTER.mage.baseStats.mightMult);
   assert.ok(lv4Perks.speed > HERO_ROSTER.mage.baseStats.speed);
+
+  // Zero sovrapposizione: 12 armi esclusive totali tra i 4 eroi
+  const allHeroWeaponIds = HERO_ORDER.flatMap((id) => HERO_ROSTER[id].weapons.map((w) => w.id));
+  assert.equal(new Set(allHeroWeaponIds).size, 12, 'Tutti i 4 eroi devono avere 3 armi esclusive senza duplicati');
 
   // Guadagno EXP permanente salvato su localStorage
   localStorage.removeItem('ashen_midgard_meta_v1');
   const res = grantHeroMetaXp('assassin', { elapsedSec: 120, kills: 100, bossDefeated: false });
   assert.ok(res.gainedXp >= 120);
   assert.ok(res.newLevel >= 2);
-  assert.equal(res.unlockedWeapons.some((w) => w.id === 'blades'), true);
+  assert.equal(res.unlockedWeapons.some((w) => w.id === 'scythe'), true);
 
   const reloaded = loadMetaProgress();
   assert.equal(getHeroLevelFromXp(reloaded.heroXp.assassin).level, res.newLevel);
@@ -689,15 +699,19 @@ test('Bilanciamento Nemici (+60% HP) & Scala 4x (+10% dimensione + hitbox)', asy
   scene.create();
   await scene.startNewRun({ heroId: 'warrior', startingWeaponId: 'axe' });
 
-  // Verifica +60% HP base a wave 0
+  // Verifica HP base invariato per Draugr (32) e buff HP per i nemici non base
   scene._spawnEnemy('swarm', 0, 0, 150);
   scene._spawnEnemy('fast', 0, 1, 150);
   scene._spawnEnemy('tank', 0, 2, 150);
-  const [swarm, fast, tank] = scene.activeEnemies;
+  scene._spawnEnemy('archer', 0, 3, 150);
+  scene._spawnEnemy('berserker', 0, 4, 150);
+  const [swarm, fast, tank, archer, berserker] = scene.activeEnemies;
 
-  assert.equal(swarm.maxHp, 32, 'Draugr base deve avere 32 HP (+60% rispetto a 20)');
-  assert.equal(fast.maxHp, 26, 'Lupo Fenrir base deve avere 26 HP (+62% rispetto a 16)');
-  assert.equal(tank.maxHp, 90, 'Jotun base deve avere 90 HP (+60% rispetto a 56)');
+  assert.equal(swarm.maxHp, 32, 'Draugr base deve restare a 32 HP');
+  assert.equal(fast.maxHp, 38, 'Lupo Fenrir non-base deve avere 38 HP');
+  assert.equal(tank.maxHp, 140, 'Jotun Corazzato non-base deve avere 140 HP');
+  assert.equal(archer.maxHp, 42, 'Arciere non-base deve avere 42 HP');
+  assert.equal(berserker.maxHp, 88, 'Berserker non-base deve avere 88 HP');
 
   // 1 colpo non critico di Ascia Lv.1 (27 danni) lascia vivo il Draugr (2 colpi richiesti)
   scene._damageEnemy(swarm, 27, 1, 0, 80, false);
@@ -1054,6 +1068,204 @@ test('Campagna Multi-Regno (Muspelheim/Surtr & Helheim/Hel), Dialoghi In-Run & S
   assert.equal(unlockedIds.has('enemy_hel_boss'), true);
   assert.equal(unlockedIds.has('lore_muspelheim'), true);
   assert.equal(unlockedIds.has('lore_helheim'), true);
+
+  globalThis.document = prevDoc;
+});
+
+test('5 Nuove Armi Esclusive, Evoluzioni, Level-Up Filtrato & Riepilogo Danni', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  const scene = new GameScene();
+  let lastChoices = null;
+  scene.configureBridge({ onLevelUp: (c) => { lastChoices = c; } }, null);
+  scene.preload();
+  scene.create();
+
+  // 1. Astrid (warrior) -> Lancia di Odino + filtro Level-Up solo sulle sue 3 armi
+  await scene.startNewRun({ heroId: 'warrior', startingWeaponId: 'spear', textureKey: 'hero_warrior' });
+  scene._spawnEnemy('tank', 0, 0, 110);
+  scene.timers.spear = 0;
+  scene.update(100, 33);
+  const spearProj = scene.activeProjectiles.find((p) => p.kind === 'spear' && p.texture === 'spear_proj');
+  assert.ok(spearProj, 'Lancia di Odino deve lanciare spear_proj');
+
+  scene._openLevelUpScreen();
+  const warriorForbidden = ['dagger', 'scythe', 'fangs', 'orb', 'lightning', 'grimoire', 'hammer', 'aura', 'flail'];
+  assert.equal(
+    lastChoices.some((c) => warriorForbidden.includes(c.id)),
+    false,
+    'Il Level-Up di Astrid non deve proporre armi esclusive di altri eroi'
+  );
+  scene.resumeGame();
+
+  // 2. Skadi (assassin) -> Falci del Crepuscolo (ritorno boomerang) & Spine d'Ombra (rimbalzo)
+  await scene.startNewRun({ heroId: 'assassin', startingWeaponId: 'scythe', textureKey: 'hero_assassin' });
+  scene._spawnEnemy('tank', 0, 0, 120);
+  scene._spawnEnemy('tank', 0, 0.5, 160);
+  scene.timers.scythe = 0;
+  scene.update(100, 33);
+  const scytheProj = scene.activeProjectiles.find((p) => p.kind === 'scythe' && p.texture === 'scythe_proj');
+  assert.ok(scytheProj, 'Falci del Crepuscolo deve lanciare scythe_proj');
+  scytheProj.life = 0.5;
+  scene._updateProjectiles(0.02);
+  assert.equal(scytheProj.returning, true, 'La falce deve invertire la rotta in fase di ritorno');
+
+  scene.applyUpgrade('fangs');
+  scene.timers.fangs = 0;
+  scene.update(200, 33);
+  const fangProj = scene.activeProjectiles.find((p) => p.kind === 'fangs' && p.texture === 'fang_proj');
+  assert.ok(fangProj, 'Spine d Ombra deve lanciare fang_proj');
+  const firstTarget = scene.activeEnemies[0];
+  scene._onProjectileHitEnemy(fangProj, firstTarget);
+  assert.equal(fangProj.active, true, 'La spina deve rimbalzare sul secondo nemico anziché riciclarsi subito');
+
+  // 3. Freya (mage) -> Grimorio Astrale (pilastri VFX + danno)
+  await scene.startNewRun({ heroId: 'mage', startingWeaponId: 'grimoire', textureKey: 'hero_mage' });
+  const grimoireTarget = scene._spawnEnemy('tank', 0, 0, 120);
+  const hpBeforeGrimoire = grimoireTarget.hp;
+  scene.timers.grimoire = 0;
+  scene.update(100, 33);
+  assert.ok(scene.activeAstralPillars.length >= 1, 'Grimorio Astrale deve generare pilastri runici');
+  assert.ok(grimoireTarget.hp < hpBeforeGrimoire, 'Grimorio Astrale deve danneggiare i nemici sotto il pilastro');
+
+  // 4. Bjorn (juggernaut) -> Flagello a Catena (spazzata rotante) + Evoluzioni + Riepilogo Danni
+  await scene.startNewRun({ heroId: 'juggernaut', startingWeaponId: 'flail', textureKey: 'hero_juggernaut' });
+  const flailTarget = scene._spawnEnemy('tank', 0, 0, 82);
+  const hpBeforeFlail = flailTarget.hp;
+  scene.timers.flail = 0;
+  scene.update(100, 33);
+  assert.ok(scene.activeFlailSwing, 'Flagello a Catena deve attivare la spazzata rotante');
+  for (let s = 0; s < 14; s++) {
+    scene.update(133 + s * 33, 33);
+  }
+  assert.ok(flailTarget.hp < hpBeforeFlail, 'Il Flagello a Catena deve colpire i nemici lungo l arco');
+
+  for (const [wId, passiveId, evoId] of [
+    ['spear', 'swift', 'evo_spear'],
+    ['scythe', 'might', 'evo_scythe'],
+    ['fangs', 'area', 'evo_fangs'],
+    ['grimoire', 'regen', 'evo_grimoire'],
+    ['flail', 'area', 'evo_flail']
+  ]) {
+    scene.levels[wId] = 5;
+    scene.levels[passiveId] = 1;
+    assert.equal(scene._getAvailableEvolutions().some((e) => e.id === evoId), true, `Evoluzione mancante: ${evoId}`);
+    scene.applyUpgrade(evoId);
+    assert.equal(scene.evolvedWeapons[wId], true);
+  }
+
+  const breakdown = scene._getDamageBreakdown();
+  assert.ok(breakdown.length >= 1, 'Il riepilogo danni deve contenere le armi usate');
+  assert.equal(breakdown[0].id, 'flail');
+  assert.ok(breakdown[0].damage > 0 && breakdown[0].percent === 100);
+
+  globalThis.document = prevDoc;
+});
+
+test('4 Nuovi Archetipi Nemici, Abilità Attive Eroi, Modificatori Sfida & Codex Esteso', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  const scene = new GameScene();
+  let lastHud = null;
+  let lastEnd = null;
+  scene.configureBridge(
+    {
+      onHudUpdate: (h) => { lastHud = h; },
+      onRunEnded: (r) => { lastEnd = r; }
+    },
+    null
+  );
+  scene.preload();
+  scene.create();
+
+  // 1. Verifica Modificatore Sfida Titanomachy (+55% HP, +60% EXP, persistenza storage)
+  assert.deepEqual(CHALLENGE_ORDER, ['standard', 'double_horde', 'dark_frenzy', 'titanomachy']);
+  localStorage.removeItem(REALM_STORAGE_KEY);
+  const rp = loadRealmProgress();
+  rp.selectedChallenge = 'titanomachy';
+  saveRealmProgress(rp);
+  assert.equal(loadRealmProgress().selectedChallenge, 'titanomachy');
+  assert.equal(getChallengeConfig('titanomachy').hpMult, 1.55);
+
+  await scene.startNewRun({
+    heroId: 'mage',
+    startingWeaponId: 'orb',
+    realmId: 'midgard',
+    challengeId: 'titanomachy'
+  });
+
+  const titanSwarm = scene._spawnEnemy('swarm', 0, 0, 180);
+  assert.equal(titanSwarm.maxHp, Math.round(32 * 1.55), 'Titanomachia deve scalare gli HP nemici del +55%');
+
+  // 2. Sciamano Runico evoca alleati nell'orda
+  const shaman = scene._spawnEnemy('shaman', 0, 0, 220);
+  shaman.summonWindup = 0.01;
+  const countBeforeSummon = scene.activeEnemies.length;
+  scene._updateEnemiesAndBoss(0.03);
+  assert.ok(scene.activeEnemies.length > countBeforeSummon, 'Lo Sciamano Runico deve evocare alleati nell orda');
+
+  // 3. Portatore Esplosivo detona con telegrafo alla morte
+  const bomber = scene._spawnEnemy('bomber', 0, 1, 200);
+  const teleBefore = scene.activeTelegraphs.length;
+  scene._killEnemy(bomber);
+  assert.equal(scene.activeTelegraphs.length, teleBefore + 1, 'Il Portatore Esplosivo deve creare un telegrafo esplosivo alla morte');
+
+  // 4. Scudiero Corazzato riduce i colpi frontali ma non quelli bypassShield
+  const shield = scene._spawnEnemy('shieldbearer', 0, 0, 140);
+  shield.setPosition(140, 0);
+  scene.hero.setPosition(0, 0);
+  const shieldHpBefore = shield.hp;
+  scene._damageEnemy(shield, 40, 1, 0, 50, false, 0xffffff, 'axe', false);
+  assert.equal(shieldHpBefore - shield.hp, 14, 'Lo Scudiero Corazzato deve bloccare il 65% dei colpi frontali (40 -> 14)');
+  const hpAfterBlock = shield.hp;
+  scene._damageEnemy(shield, 40, 1, 0, 50, false, 0xffffff, 'aura', true);
+  assert.equal(hpAfterBlock - shield.hp, 40, 'Gli attacchi ad area/aura con bypassShield devono infliggere danno pieno');
+
+  // 5. Ombra Guizzante esegue scatto laterale improvviso
+  const stalker = scene._spawnEnemy('stalker', 0, 0, 160);
+  stalker.dashCooldown = 0;
+  scene._updateEnemiesAndBoss(0.03);
+  assert.ok(stalker.dashTime > 0, 'L Ombra Guizzante deve attivare lo scatto laterale');
+
+  // 6. Abilità Attive per tutti e 4 gli eroi (Freya congelamento + magnete, Astrid, Skadi, Bjorn)
+  scene._spawnXpGem(120, 120, 3);
+  assert.equal(scene.triggerActiveSkill(), true);
+  assert.ok(lastHud?.activeSkill && lastHud.activeSkill.ready === false);
+  assert.ok(shield.freezeTimer >= 2.8, 'Rottura Runica di Freya deve congelare i nemici vicini');
+  assert.equal(scene.activeGems.some((g) => g.active && g.magnetized), true, 'Rottura Runica deve attirare le gemme');
+
+  for (const hId of ['warrior', 'assassin', 'juggernaut']) {
+    await scene.startNewRun({ heroId: hId, startingWeaponId: HERO_ROSTER[hId].weapons[0].id, challengeId: 'titanomachy' });
+    scene._spawnEnemy('swarm', 0, 0, 90);
+    assert.equal(scene.triggerActiveSkill(), true, `Abilità attiva non attivata per ${hId}`);
+    if (hId === 'warrior') assert.ok(scene.activeSkillBuffTimer > 0);
+    if (hId === 'assassin') assert.ok(scene.activeProjectiles.some((p) => p.kind === 'dagger'));
+    if (hId === 'juggernaut') assert.ok(scene.ironSkinTimer > 0);
+  }
+
+  // Verifica Game Over con challengeId e xpBonusMult combinato
+  scene._triggerGameOver();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(lastEnd?.challengeId, 'titanomachy');
+  assert.equal(lastEnd?.xpBonusMult, 1.6);
+  assert.ok(lastEnd?.skillsUsed >= 1);
+
+  // 7. Sblocco nuove voci Codex
+  localStorage.removeItem(CODEX_STORAGE_KEY);
+  const codexRes = recordRunCodexProgress({
+    heroId: 'warrior',
+    kills: 35,
+    elapsedSec: 60,
+    skillsUsed: 2,
+    encounteredEnemies: ['shaman', 'bomber', 'shieldbearer', 'stalker'],
+    damageBreakdown: [{ id: 'axe', damage: 200, percent: 100 }]
+  });
+  const newCodexIds = new Set(codexRes.newlyUnlocked.map((e) => e.id));
+  for (const expectedId of ['enemy_shaman', 'enemy_bomber', 'enemy_shieldbearer', 'enemy_stalker', 'wpn_exclusive_arsenal', 'lore_active_skills']) {
+    assert.equal(newCodexIds.has(expectedId), true, `Voce Codex non sbloccata: ${expectedId}`);
+  }
 
   globalThis.document = prevDoc;
 });

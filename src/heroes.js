@@ -11,7 +11,7 @@ export const HERO_ROSTER = {
     title: 'Valchiria',
     textureKey: 'hero_warrior',
     accent: '#f59e0b',
-    summary: 'Equilibrata e resistente con asce pesanti.',
+    summary: 'Equilibrata e resistente, domina asce pesanti, lame celesti e lance perforanti.',
     baseStats: {
       maxHp: 115,
       speed: 138,
@@ -19,10 +19,18 @@ export const HERO_ROSTER = {
       areaMult: 1.0,
       critChance: 0.18
     },
+    activeSkill: {
+      id: 'skill_valkyrie_leap',
+      name: 'Balzo della Valchiria',
+      shortName: 'Balzo',
+      cooldownSec: 14,
+      accent: '#f59e0b',
+      description: 'Onda dorata ad area che stordisce i nemici e dona +35% velocità per 2,2s.'
+    },
     weapons: [
       { id: 'axe', name: 'Ascia Runica', unlockLevel: 1, role: 'Arma Base' },
       { id: 'blades', name: 'Lame di Valchiria', unlockLevel: 2, role: 'Secondaria I' },
-      { id: 'aura', name: 'Aura del Crepuscolo', unlockLevel: 4, role: 'Secondaria II' }
+      { id: 'spear', name: 'Lancia di Odino', unlockLevel: 4, role: 'Secondaria II' }
     ]
   },
   assassin: {
@@ -31,7 +39,7 @@ export const HERO_ROSTER = {
     title: 'Assassina',
     textureKey: 'hero_assassin',
     accent: '#e879f9',
-    summary: 'Velocissima, raffiche di pugnali e critici letali.',
+    summary: 'Velocissima, scatena pugnali, falci boomerang e spine oscure a rimbalzo.',
     baseStats: {
       maxHp: 88,
       speed: 162,
@@ -39,10 +47,18 @@ export const HERO_ROSTER = {
       areaMult: 0.95,
       critChance: 0.34
     },
+    activeSkill: {
+      id: 'skill_shadow_step',
+      name: 'Passo d’Ombra',
+      shortName: 'Ombra',
+      cooldownSec: 11,
+      accent: '#e879f9',
+      description: 'Scatto fantasma invulnerabile con doppia raffica radiale di pugnali.'
+    },
     weapons: [
       { id: 'dagger', name: 'Pugnali d’Ombra', unlockLevel: 1, role: 'Arma Base' },
-      { id: 'blades', name: 'Lame di Valchiria', unlockLevel: 2, role: 'Secondaria I' },
-      { id: 'axe', name: 'Ascia Runica', unlockLevel: 4, role: 'Secondaria II' }
+      { id: 'scythe', name: 'Falci del Crepuscolo', unlockLevel: 2, role: 'Secondaria I' },
+      { id: 'fangs', name: 'Spine d’Ombra', unlockLevel: 4, role: 'Secondaria II' }
     ]
   },
   mage: {
@@ -51,7 +67,7 @@ export const HERO_ROSTER = {
     title: 'Maga Runica',
     textureKey: 'hero_mage',
     accent: '#38bdf8',
-    summary: 'Esplosioni arcane ad ampia area e controllo folla.',
+    summary: 'Controlla il campo con esplosioni arcane, fulmini e pilastri dal grimorio.',
     baseStats: {
       maxHp: 92,
       speed: 134,
@@ -59,10 +75,18 @@ export const HERO_ROSTER = {
       areaMult: 1.22,
       critChance: 0.16
     },
+    activeSkill: {
+      id: 'skill_rune_rupture',
+      name: 'Rottura Runica',
+      shortName: 'Rottura',
+      cooldownSec: 15,
+      accent: '#38bdf8',
+      description: 'Nova glaciale ad ampio raggio che congela i nemici per 3s e attira le gemme.'
+    },
     weapons: [
       { id: 'orb', name: 'Globo Arcano', unlockLevel: 1, role: 'Arma Base' },
       { id: 'lightning', name: 'Saetta di Thor', unlockLevel: 2, role: 'Secondaria I' },
-      { id: 'aura', name: 'Aura del Crepuscolo', unlockLevel: 4, role: 'Secondaria II' }
+      { id: 'grimoire', name: 'Grimorio Astrale', unlockLevel: 4, role: 'Secondaria II' }
     ]
   },
   juggernaut: {
@@ -71,7 +95,7 @@ export const HERO_ROSTER = {
     title: 'Martello di Ferro',
     textureKey: 'hero_juggernaut',
     accent: '#fb923c',
-    summary: 'Colosso corazzato con onde d’urto sismiche e grande resistenza.',
+    summary: 'Colosso corazzato con martello sismico, aura bruciante e flagello a catena.',
     baseStats: {
       maxHp: 138,
       speed: 128,
@@ -79,10 +103,18 @@ export const HERO_ROSTER = {
       areaMult: 1.15,
       critChance: 0.14
     },
+    activeSkill: {
+      id: 'skill_iron_skin',
+      name: 'Pelle di Ferro',
+      shortName: 'Egida',
+      cooldownSec: 16,
+      accent: '#fb923c',
+      description: 'Scudo d’acciaio (-75% danni subiti per 4s) e schianto sismico immediato.'
+    },
     weapons: [
       { id: 'hammer', name: 'Martello Sismico', unlockLevel: 1, role: 'Arma Base' },
       { id: 'aura', name: 'Aura del Crepuscolo', unlockLevel: 2, role: 'Secondaria I' },
-      { id: 'axe', name: 'Ascia Runica', unlockLevel: 4, role: 'Secondaria II' }
+      { id: 'flail', name: 'Flagello a Catena', unlockLevel: 4, role: 'Secondaria II' }
     ]
   }
 };
@@ -178,9 +210,17 @@ export function loadMetaProgress() {
     const raw = localStorage.getItem(META_STORAGE_KEY);
     if (!raw) return base;
     const parsed = JSON.parse(raw);
+    const mergedWeapons = { ...base.selectedWeapons, ...(parsed?.selectedWeapons || {}) };
+    // Garantisci che vecchi salvataggi con armi rimosse dal kit (es. blades su Skadi) ricadano sull'arma valida dell'eroe
+    for (const hId of HERO_ORDER) {
+      const validIds = HERO_ROSTER[hId].weapons.map((w) => w.id);
+      if (!validIds.includes(mergedWeapons[hId])) {
+        mergedWeapons[hId] = base.selectedWeapons[hId];
+      }
+    }
     return {
       selectedHero: HERO_ROSTER[parsed?.selectedHero] ? parsed.selectedHero : base.selectedHero,
-      selectedWeapons: { ...base.selectedWeapons, ...(parsed?.selectedWeapons || {}) },
+      selectedWeapons: mergedWeapons,
       heroXp: { ...base.heroXp, ...(parsed?.heroXp || {}) }
     };
   } catch {

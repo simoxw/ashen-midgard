@@ -34,7 +34,11 @@ export class AudioEngine {
       blade: 0,
       aura: 0,
       hammer: 0,
-      crate: 0
+      crate: 0,
+      shield: 0,
+      skill: 0,
+      spear: 0,
+      chain: 0
     };
   }
 
@@ -158,6 +162,91 @@ export class AudioEngine {
     subGain.connect(this.masterGain);
     sub.start(now);
     sub.stop(now + 0.25);
+  }
+
+  playShieldBlock() {
+    if (!this._canPlay('shield', 110)) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const osc2 = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc2.type = 'sine';
+    osc.frequency.setValueAtTime(680, now);
+    osc.frequency.exponentialRampToValueAtTime(320, now + 0.11);
+    osc2.frequency.setValueAtTime(1020, now);
+    osc2.frequency.exponentialRampToValueAtTime(510, now + 0.09);
+
+    gain.gain.setValueAtTime(0.16, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(gain);
+    osc2.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc2.start(now);
+    osc.stop(now + 0.13);
+    osc2.stop(now + 0.13);
+  }
+
+  playSpearThrow() {
+    if (!this._canPlay('spear', 100)) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.exponentialRampToValueAtTime(190, now + 0.11);
+    gain.gain.setValueAtTime(0.13, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.13);
+  }
+
+  playChainSweep() {
+    if (!this._canPlay('chain', 160)) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(280, now);
+    osc.frequency.linearRampToValueAtTime(420, now + 0.08);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.18);
+    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  playActiveSkill(heroId = 'warrior') {
+    if (this.muted) return;
+    this.unlock();
+    if (!this._canPlay('skill', 250)) return;
+    const now = this.ctx.currentTime;
+    const chordMap = {
+      warrior: [392.0, 523.25, 783.99],
+      assassin: [587.33, 880.0, 1174.66],
+      mage: [440.0, 659.25, 987.77],
+      juggernaut: [196.0, 293.66, 392.0]
+    };
+    const freqs = chordMap[heroId] || chordMap.warrior;
+    freqs.forEach((f, idx) => {
+      const start = now + idx * 0.035;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = heroId === 'juggernaut' ? 'sawtooth' : 'triangle';
+      osc.frequency.setValueAtTime(f, start);
+      osc.frequency.exponentialRampToValueAtTime(f * 1.12, start + 0.22);
+      gain.gain.setValueAtTime(0.16, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.26);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(start);
+      osc.stop(start + 0.28);
+    });
   }
 
   playCrateBreak() {

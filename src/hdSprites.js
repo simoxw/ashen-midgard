@@ -65,6 +65,35 @@ function drawRivets(ctx, points, r, fill = '#e2e8f0', shadow = '#0f172a') {
   }
 }
 
+function drawSpecularArc(ctx, x, y, rx, ry, rot = -0.35, alpha = 0.35) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  const grad = ctx.createLinearGradient(0, -ry, 0, ry);
+  grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+  grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawArmorBevel(ctx, x, y, w, h, r, highlight = 'rgba(255,255,255,0.38)', shadow = 'rgba(2,6,23,0.45)') {
+  ctx.save();
+  drawRoundedPath(ctx, x + 2, y + 2, w - 4, h - 4, Math.max(2, r - 2));
+  ctx.strokeStyle = shadow;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x + r, y + 2.5);
+  ctx.lineTo(x + w - r, y + 2.5);
+  ctx.strokeStyle = highlight;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+  ctx.restore();
+}
+
 export function generateHdTextures(textures) {
   // 1. Terreno Tundra Nordica 512x512 con lastroni di basalto scolpiti, brina e rune
   registerCanvas(textures, 'ground_tile', 512, 512, (ctx, w, h) => {
@@ -340,9 +369,11 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 3;
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(241, 245, 249, 0.45)';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = 'rgba(241, 245, 249, 0.55)';
+    ctx.lineWidth = 1.8;
     ctx.stroke();
+    drawArmorBevel(ctx, 41, 57, 60, 60, 13, 'rgba(254, 243, 199, 0.55)');
+    drawSpecularArc(ctx, 64, 70, 16, 7, -0.2, 0.28);
 
     ctx.strokeStyle = '#f59e0b';
     ctx.lineWidth = 2.6;
@@ -569,6 +600,8 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#090d16';
     ctx.lineWidth = 2.8;
     ctx.stroke();
+    drawArmorBevel(ctx, 46, 58, 52, 56, 12, 'rgba(232, 121, 249, 0.45)');
+    drawSpecularArc(ctx, 64, 70, 14, 6, -0.3, 0.22);
 
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 6;
@@ -710,7 +743,8 @@ export function generateHdTextures(textures) {
     ctx.stroke();
 
     const mantle = ctx.createLinearGradient(32, 56, 112, 80);
-    mantle.addColorStop(0, '#0ea5e9');
+    mantle.addColorStop(0, '#38bdf8');
+    mantle.addColorStop(0.5, '#0ea5e9');
     mantle.addColorStop(1, '#0369a1');
     ctx.fillStyle = mantle;
     ctx.beginPath();
@@ -719,8 +753,9 @@ export function generateHdTextures(textures) {
     ctx.quadraticCurveTo(72, 84, 34, 69);
     ctx.fill();
     ctx.strokeStyle = '#bae6fd';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.2;
     ctx.stroke();
+    drawSpecularArc(ctx, 72, 64, 24, 5, 0, 0.25);
 
     const hair = ctx.createLinearGradient(42, 20, 102, 88);
     hair.addColorStop(0, '#ffffff');
@@ -853,6 +888,8 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#fb923c';
     ctx.lineWidth = 2;
     ctx.stroke();
+    drawArmorBevel(ctx, 35, 56, 72, 60, 14, 'rgba(253, 186, 116, 0.5)');
+    drawSpecularArc(ctx, 64, 69, 20, 7, -0.15, 0.26);
 
     // Runa della forgia sul pettorale
     ctx.strokeStyle = '#fdba74';
@@ -1203,6 +1240,8 @@ export function generateHdTextures(textures) {
     ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 2;
     ctx.stroke();
+    drawArmorBevel(ctx, 33, 56, 102, 90, 18, 'rgba(226, 232, 240, 0.4)');
+    drawSpecularArc(ctx, 76, 76, 28, 9, -0.15, 0.25);
 
     drawRivets(ctx, [[45, 68], [123, 68], [45, 132], [123, 132]], 2.5, '#cbd5e1');
 
@@ -3015,4 +3054,443 @@ export function generateHdTextures(textures) {
     ctx.closePath();
     ctx.fill();
   });
+
+  // ===========================================================================
+  // 14. NUOVE ARMI ESCLUSIVE — Proiettili HD 4x
+  // ===========================================================================
+  registerCanvas(textures, 'spear_proj', 96, 32, (ctx) => {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    // Asta dorata con incavo runico
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(8, 16);
+    ctx.lineTo(66, 16);
+    ctx.stroke();
+    const shaft = ctx.createLinearGradient(8, 12, 66, 20);
+    shaft.addColorStop(0, '#78350f');
+    shaft.addColorStop(0.5, '#f59e0b');
+    shaft.addColorStop(1, '#fde68a');
+    ctx.strokeStyle = shaft;
+    ctx.lineWidth = 4.5;
+    ctx.stroke();
+
+    // Punta alata di Odino
+    const tip = ctx.createLinearGradient(58, 5, 93, 27);
+    tip.addColorStop(0, '#fbbf24');
+    tip.addColorStop(0.5, '#f8fafc');
+    tip.addColorStop(1, '#ffffff');
+    ctx.fillStyle = tip;
+    ctx.beginPath();
+    ctx.moveTo(93, 16);
+    ctx.lineTo(60, 5);
+    ctx.lineTo(67, 16);
+    ctx.lineTo(60, 27);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'scythe_proj', 84, 84, (ctx) => {
+    ctx.lineJoin = 'round';
+    const glow = ctx.createRadialGradient(42, 42, 4, 42, 42, 38);
+    glow.addColorStop(0, 'rgba(232, 121, 249, 0.35)');
+    glow.addColorStop(1, 'rgba(232, 121, 249, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(42, 42, 38, 0, Math.PI * 2);
+    ctx.fill();
+
+    const blade = ctx.createLinearGradient(12, 12, 72, 72);
+    blade.addColorStop(0, '#fdf4ff');
+    blade.addColorStop(0.5, '#e879f9');
+    blade.addColorStop(1, '#581c87');
+    ctx.fillStyle = blade;
+    // Doppia mezzaluna rotante
+    for (const rot of [0, Math.PI]) {
+      ctx.save();
+      ctx.translate(42, 42);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      ctx.moveTo(-6, -34);
+      ctx.quadraticCurveTo(36, -24, 34, 8);
+      ctx.quadraticCurveTo(18, -14, -4, -18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.fillStyle = '#fef08a';
+    ctx.beginPath();
+    ctx.arc(42, 42, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'fang_proj', 64, 36, (ctx) => {
+    const fg = ctx.createLinearGradient(8, 18, 60, 18);
+    fg.addColorStop(0, '#581c87');
+    fg.addColorStop(0.55, '#c084fc');
+    fg.addColorStop(1, '#ffffff');
+    ctx.fillStyle = fg;
+    ctx.beginPath();
+    ctx.moveTo(60, 18);
+    ctx.lineTo(18, 6);
+    ctx.lineTo(28, 18);
+    ctx.lineTo(18, 30);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#090d16';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'grimoire_proj', 88, 88, (ctx) => {
+    const rg = ctx.createRadialGradient(44, 44, 4, 44, 44, 40);
+    rg.addColorStop(0, '#ffffff');
+    rg.addColorStop(0.35, '#38bdf8');
+    rg.addColorStop(0.75, 'rgba(99, 102, 241, 0.5)');
+    rg.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(44, 44, 40, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#bae6fd';
+    ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    ctx.arc(44, 44, 24, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(44, 14);
+    ctx.lineTo(68, 58);
+    ctx.lineTo(20, 58);
+    ctx.closePath();
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'flail_proj', 72, 72, (ctx) => {
+    ctx.lineJoin = 'round';
+    // Punte della sfera ferrata
+    ctx.fillStyle = '#e2e8f0';
+    for (let i = 0; i < 8; i++) {
+      const ang = (Math.PI * 2 * i) / 8;
+      ctx.save();
+      ctx.translate(36, 36);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(16, -5);
+      ctx.lineTo(33, 0);
+      ctx.lineTo(16, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      ctx.restore();
+    }
+    const ball = ctx.createRadialGradient(31, 31, 3, 36, 36, 20);
+    ball.addColorStop(0, '#94a3b8');
+    ball.addColorStop(0.55, '#334155');
+    ball.addColorStop(1, '#090d16');
+    ctx.fillStyle = ball;
+    ctx.beginPath();
+    ctx.arc(36, 36, 19, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+  });
+
+  // ===========================================================================
+  // 15. QUATTRO NUOVI ARCHETIPI NEMICI 4x PER TUTTI I 3 REGNI (12 set animati)
+  // ===========================================================================
+  const ARCHETYPE_PALETTES = [
+    {
+      suffix: '',
+      robeTop: '#581c87', robeBot: '#1e1b4b', robeRim: '#c084fc', orbCore: '#f5d0fe', orbGlow: 'rgba(168, 85, 247, 0.96)',
+      bomberBody: '#9a3412', bomberCore: '#fef08a', bomberGlow: 'rgba(249, 115, 22, 0.98)',
+      shieldPlate: '#475569', shieldRim: '#7dd3fc', shieldArmor: '#334155',
+      stalkerBody: '#312e81', stalkerTrim: '#e879f9', stalkerEye: 'rgba(232, 121, 249, 0.98)'
+    },
+    {
+      suffix: '_muspel',
+      robeTop: '#9a3412', robeBot: '#292524', robeRim: '#fb923c', orbCore: '#fffbeb', orbGlow: 'rgba(249, 115, 22, 0.98)',
+      bomberBody: '#7f1d1d', bomberCore: '#fef08a', bomberGlow: 'rgba(239, 68, 68, 0.98)',
+      shieldPlate: '#44403c', shieldRim: '#fb923c', shieldArmor: '#292524',
+      stalkerBody: '#7c2d12', stalkerTrim: '#fbbf24', stalkerEye: 'rgba(251, 146, 60, 0.98)'
+    },
+    {
+      suffix: '_hel',
+      robeTop: '#065f46', robeBot: '#0f172a', robeRim: '#34d399', orbCore: '#ecfdf5', orbGlow: 'rgba(16, 185, 129, 0.98)',
+      bomberBody: '#3b0764', bomberCore: '#d8b4fe', bomberGlow: 'rgba(168, 85, 247, 0.98)',
+      shieldPlate: '#1e293b', shieldRim: '#34d399', shieldArmor: '#0f172a',
+      stalkerBody: '#064e3b', stalkerTrim: '#a855f7', stalkerEye: 'rgba(52, 211, 153, 0.98)'
+    }
+  ];
+
+  for (const pal of ARCHETYPE_PALETTES) {
+    const prefix = `enemy${pal.suffix}`;
+
+    // A) Sciamano Runico (128x148)
+    registerAnimated(`${prefix}_shaman`, 128, 148, (ctx, frameIdx) => {
+      const { stride, bob, sway } = getFrameKinematics(frameIdx);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      ctx.save();
+      ctx.translate(0, bob * 0.9);
+
+      // Veste cerimoniale ampia + mantello runico
+      const robe = ctx.createLinearGradient(34, 48, 94, 134);
+      robe.addColorStop(0, pal.robeTop);
+      robe.addColorStop(0.65, pal.robeBot);
+      robe.addColorStop(1, '#090d16');
+      ctx.fillStyle = robe;
+      ctx.beginPath();
+      ctx.moveTo(40, 50);
+      ctx.lineTo(24 + stride * 0.3, 130);
+      ctx.quadraticCurveTo(64, 142, 104 + stride * 0.3, 130);
+      ctx.lineTo(88, 50);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.strokeStyle = pal.robeRim;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Maschera & cappuccio con corna rituali
+      for (const [hx, dir] of [[44, -1], [84, 1]]) {
+        ctx.fillStyle = '#e2e8f0';
+        ctx.beginPath();
+        ctx.moveTo(hx, 30);
+        ctx.quadraticCurveTo(hx + dir * 22, 18, hx + dir * 18, 4);
+        ctx.lineTo(hx - dir * 3, 22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#090d16';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.fillStyle = pal.robeBot;
+      ctx.beginPath();
+      ctx.moveTo(40, 48);
+      ctx.quadraticCurveTo(64, 8, 88, 48);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = pal.robeRim;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+
+      drawGlowEye(ctx, 56, 35, 2.9, pal.orbCore, pal.orbGlow);
+      drawGlowEye(ctx, 72, 35, 2.9, pal.orbCore, pal.orbGlow);
+
+      // Bastone sciamanico con sfera d'evocazione fluttuante
+      ctx.save();
+      ctx.translate(104, 78);
+      ctx.rotate(sway * 1.1);
+      ctx.translate(-104, -78);
+      ctx.strokeStyle = '#451a03';
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.moveTo(104, 34);
+      ctx.lineTo(104, 132);
+      ctx.stroke();
+      drawGlowEye(ctx, 104, 24, 6.2, pal.orbCore, pal.orbGlow);
+      ctx.restore();
+      ctx.restore();
+    });
+
+    // B) Portatore Esplosivo (124x140)
+    registerAnimated(`${prefix}_bomber`, 124, 140, (ctx, frameIdx) => {
+      const { stride, bob, sway } = getFrameKinematics(frameIdx);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      ctx.fillStyle = '#0f172a';
+      drawRoundedPath(ctx, 36 - stride * 0.45, 96 - stride * 0.7, 17, 34, 5);
+      ctx.fill();
+      drawRoundedPath(ctx, 70 + stride * 0.45, 96 + stride * 0.7, 17, 34, 5);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(0, bob);
+
+      // Corpo curvo con barile/cristallo instabile
+      ctx.fillStyle = '#292524';
+      drawRoundedPath(ctx, 32, 50, 60, 52, 15);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Nucleo esplosivo pulsante incandescente frontale
+      const bombGrad = ctx.createRadialGradient(62, 76, 4, 62, 76, 28);
+      bombGrad.addColorStop(0, pal.bomberCore);
+      bombGrad.addColorStop(0.5, pal.bomberBody);
+      bombGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = bombGrad;
+      ctx.beginPath();
+      ctx.arc(62, 76, 28, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = pal.bomberBody;
+      ctx.beginPath();
+      ctx.arc(62, 76, 17 + (frameIdx % 2) * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = pal.bomberCore;
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      // Testa ghignante + miccia luminosa
+      ctx.fillStyle = '#44403c';
+      ctx.beginPath();
+      ctx.ellipse(62, 34, 16, 15, sway * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      drawGlowEye(ctx, 55, 34, 2.8, pal.bomberCore, pal.bomberGlow);
+      drawGlowEye(ctx, 69, 34, 2.8, pal.bomberCore, pal.bomberGlow);
+      drawGlowEye(ctx, 62, 12, 4.2, '#ffffff', pal.bomberGlow);
+      ctx.restore();
+    });
+
+    // C) Scudiero Corazzato (152x176)
+    registerAnimated(`${prefix}_shieldbearer`, 152, 176, (ctx, frameIdx) => {
+      const { stride, bob, sway } = getFrameKinematics(frameIdx);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      ctx.fillStyle = '#0f172a';
+      drawRoundedPath(ctx, 42, 126 - stride * 0.55, 24, 38, 7);
+      ctx.fill();
+      drawRoundedPath(ctx, 86, 126 + stride * 0.55, 24, 38, 7);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(0, bob * 0.8);
+
+      // Corazza pesante dietro lo scudo
+      ctx.fillStyle = pal.shieldArmor;
+      drawRoundedPath(ctx, 38, 52, 78, 78, 15);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Elmo chiuso a celata
+      ctx.fillStyle = pal.shieldPlate;
+      drawRoundedPath(ctx, 52, 16, 48, 40, 12);
+      ctx.fill();
+      ctx.strokeStyle = pal.shieldRim;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      drawGlowEye(ctx, 67, 36, 2.8, '#ffffff', pal.shieldRim);
+      drawGlowEye(ctx, 85, 36, 2.8, '#ffffff', pal.shieldRim);
+
+      // Lancia laterale
+      ctx.save();
+      ctx.translate(128, 78);
+      ctx.rotate(sway * 1.1);
+      ctx.translate(-128, -78);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(128, 22);
+      ctx.lineTo(128, 134);
+      ctx.stroke();
+      ctx.restore();
+
+      // Grande Scudo a Torre frontale rinforzato
+      const sg = ctx.createLinearGradient(14, 52, 78, 146);
+      sg.addColorStop(0, '#94a3b8');
+      sg.addColorStop(0.45, pal.shieldPlate);
+      sg.addColorStop(1, '#090d16');
+      ctx.fillStyle = sg;
+      drawRoundedPath(ctx, 16, 54 - stride * 0.2, 62, 92, 12);
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 3.2;
+      ctx.stroke();
+      ctx.strokeStyle = pal.shieldRim;
+      ctx.lineWidth = 2.6;
+      ctx.stroke();
+      drawArmorBevel(ctx, 16, 54 - stride * 0.2, 62, 92, 12, 'rgba(255,255,255,0.45)');
+      drawRivets(ctx, [[26, 66], [68, 66], [26, 132], [68, 132]], 2.4, pal.shieldRim);
+
+      ctx.restore();
+    });
+
+    // D) Ombra Guizzante (132x144)
+    registerAnimated(`${prefix}_stalker`, 132, 144, (ctx, frameIdx) => {
+      const { stride, bob, sway } = getFrameKinematics(frameIdx);
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+
+      // Scia svolazzante d'ombra
+      ctx.fillStyle = pal.stalkerBody;
+      ctx.beginPath();
+      ctx.moveTo(46, 54 + bob);
+      ctx.quadraticCurveTo(10, 86 + stride * 0.8, 18 + stride, 130);
+      ctx.lineTo(54, 108 + bob);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = pal.stalkerTrim;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      ctx.fillStyle = '#090d16';
+      drawRoundedPath(ctx, 42 - stride * 0.7, 94 - stride * 0.5, 16, 36, 5);
+      ctx.fill();
+      drawRoundedPath(ctx, 74 + stride * 0.7, 94 + stride * 0.5, 16, 36, 5);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(0, bob * 0.9);
+      ctx.fillStyle = pal.stalkerBody;
+      ctx.beginPath();
+      ctx.ellipse(66, 70, 26, 28, sway * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = pal.stalkerTrim;
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      // Testa incappucciata bassa e predatoria
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.moveTo(44, 48);
+      ctx.quadraticCurveTo(66, 12, 88, 48);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = pal.stalkerTrim;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      drawGlowEye(ctx, 59, 38, 3.1, '#ffffff', pal.stalkerEye);
+      drawGlowEye(ctx, 75, 38, 3.1, '#ffffff', pal.stalkerEye);
+
+      // Artigli gemelli ricurvi
+      for (const [cx, dir] of [[30, -1], [102, 1]]) {
+        ctx.strokeStyle = pal.stalkerTrim;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(cx, 72);
+        ctx.quadraticCurveTo(cx + dir * 20, 86, cx + dir * 12, 106);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }
 }

@@ -27,6 +27,8 @@ import {
 import {
   REALM_CATALOG,
   REALM_ORDER,
+  CHALLENGE_ORDER,
+  REALM_CHALLENGES,
   getRealmConfig,
   loadRealmProgress,
   saveRealmProgress,
@@ -43,6 +45,14 @@ const HERO_PORTRAITS = {
   juggernaut: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="8" rx="2" fill="currentColor" fill-opacity="0.24"/><path d="M12 12v9M9 21h6"/></svg>'
 };
 
+// Icone SVG per le abilità attive degli eroi
+const SKILL_ICONS = {
+  skill_valkyrie_leap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l3 6 6 3-6 3-3 6-3-6-6-3 6-3 3-6z" fill="currentColor" fill-opacity="0.25"/></svg>',
+  skill_shadow_step: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 17l6-6-4-4 12-3-3 12-4-4-7 5z" fill="currentColor" fill-opacity="0.22"/></svg>',
+  skill_rune_rupture: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity="0.28"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>',
+  skill_iron_skin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l7 3v6c0 5-3.2 8.7-7 11-3.8-2.3-7-6-7-11V5l7-3z" fill="currentColor" fill-opacity="0.26"/><path d="M9 12h6M12 9v6"/></svg>'
+};
+
 // Icone SVG nitide per le carte Level-Up e la barra build attiva
 const UPGRADE_ICONS = {
   axe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5"/><path d="M13 3c4 0 8 3 8 7l-6-2-2-5z" fill="currentColor" fill-opacity="0.25"/></svg>',
@@ -52,6 +62,11 @@ const UPGRADE_ICONS = {
   dagger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l5-5m11-11l-9 5 4 4 5-9z" fill="currentColor" fill-opacity="0.25"/><path d="M7 13l4 4"/></svg>',
   orb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6" fill="currentColor" fill-opacity="0.28"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
   hammer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="4" width="14" height="7" rx="1.5" fill="currentColor" fill-opacity="0.26"/><path d="M12 11v10"/></svg>',
+  spear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20L17 7"/><path d="M14 4l6 0 0 6-6-6z" fill="currentColor" fill-opacity="0.28"/></svg>',
+  scythe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L15 5c4 1 6 5 5 10"/><path d="M15 5c-4 1-7 4-8 8" stroke-opacity="0.65"/></svg>',
+  fangs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18l5-12 3 5 6-7-4 14-4-4-6 4z" fill="currentColor" fill-opacity="0.25"/></svg>',
+  grimoire: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2" fill="currentColor" fill-opacity="0.2"/><path d="M9 8h6M12 8v8M9 12h6"/></svg>',
+  flail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l7-7" stroke-dasharray="2 2"/><circle cx="16" cy="8" r="4" fill="currentColor" fill-opacity="0.28"/><path d="M16 2v2M22 8h-2M16 14v-2M10 8h2"/></svg>',
   might: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/></svg>',
   swift: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14c4 0 6-4 10-4h6l-3 5h-5l-4 4H4v-5z"/></svg>',
   area: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg>',
@@ -103,11 +118,13 @@ const el = {
   playBtn: document.getElementById('play-btn'),
   titleMuteBtn: document.getElementById('title-mute-btn'),
   realmSelectorList: document.getElementById('realm-selector-list'),
+  challengeSelectorList: document.getElementById('challenge-selector-list'),
   heroSelectorGrid: document.getElementById('hero-selector-grid'),
   heroDetailPanel: document.getElementById('hero-detail-panel'),
   selectedHeroDesc: document.getElementById('selected-hero-desc'),
   selectedHeroStats: document.getElementById('selected-hero-stats'),
   weaponSelectorList: document.getElementById('weapon-selector-list'),
+  heroActiveSkillBox: document.getElementById('hero-active-skill-box'),
   heroPerksActive: document.getElementById('hero-perks-active'),
   heroNextUnlock: document.getElementById('hero-next-unlock'),
   recTime: document.getElementById('rec-time'),
@@ -123,6 +140,10 @@ const el = {
   hudBuildStrip: document.getElementById('hud-build-strip'),
   hudBuffBar: document.getElementById('hud-buff-bar'),
   pauseBtn: document.getElementById('pause-btn'),
+  activeSkillBtn: document.getElementById('active-skill-btn'),
+  activeSkillRing: document.getElementById('active-skill-ring'),
+  activeSkillIcon: document.getElementById('active-skill-icon'),
+  activeSkillLabel: document.getElementById('active-skill-label'),
 
   inrunDialogue: document.getElementById('inrun-dialogue'),
   inrunDialogueSpeaker: document.getElementById('inrun-dialogue-speaker'),
@@ -174,6 +195,8 @@ const el = {
   endMetaUnlocks: document.getElementById('end-meta-unlocks'),
   endCodexUnlocks: document.getElementById('end-codex-unlocks'),
   endRealmUnlock: document.getElementById('end-realm-unlock'),
+  endDamageCard: document.getElementById('end-damage-card'),
+  endDamageList: document.getElementById('end-damage-list'),
   nextRealmBtn: document.getElementById('next-realm-btn'),
   playAgainBtn: document.getElementById('play-again-btn'),
   endTitleBtn: document.getElementById('end-title-btn'),
@@ -284,12 +307,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     const realmId = realmState.unlockedRealms.includes(realmState.selectedRealm)
       ? realmState.selectedRealm
       : 'midgard';
+    const challengeId = REALM_CHALLENGES[realmState.selectedChallenge]
+      ? realmState.selectedChallenge
+      : 'standard';
     return {
       heroId,
       startingWeaponId,
       textureKey: hero.textureKey,
       effectiveStats: perks,
-      realmId
+      realmId,
+      challengeId
     };
   };
 
@@ -336,6 +363,41 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
       }
       el.realmSelectorList.appendChild(card);
+    });
+  };
+
+  const renderChallengeSelection = () => {
+    realmState = loadRealmProgress(loadRecords());
+    if (!el.challengeSelectorList) return;
+    el.challengeSelectorList.innerHTML = '';
+
+    const activeChallengeId = REALM_CHALLENGES[realmState.selectedChallenge]
+      ? realmState.selectedChallenge
+      : 'standard';
+
+    CHALLENGE_ORDER.forEach((cId) => {
+      const ch = REALM_CHALLENGES[cId];
+      const selected = activeChallengeId === cId;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `challenge-card${selected ? ' is-selected' : ''}`;
+      card.style.setProperty('--challenge-accent', ch.accent);
+      card.setAttribute('aria-pressed', String(selected));
+      card.innerHTML = `
+        <div class="challenge-card-head">
+          <span class="challenge-card-name">${ch.name}</span>
+          <span class="challenge-card-exp">${ch.badge}</span>
+        </div>
+        <span class="challenge-card-desc">${ch.description}</span>
+      `;
+      card.addEventListener('click', () => {
+        audio.unlock();
+        audio.playUiClick();
+        realmState.selectedChallenge = cId;
+        saveRealmProgress(realmState);
+        renderChallengeSelection();
+      });
+      el.challengeSelectorList.appendChild(card);
     });
   };
 
@@ -426,6 +488,26 @@ window.addEventListener('DOMContentLoaded', async () => {
       });
     }
 
+    if (el.heroActiveSkillBox) {
+      const skill = activeHero.activeSkill;
+      if (skill) {
+        el.heroActiveSkillBox.innerHTML = `
+          <div class="hero-skill-badge" style="color:${activeHero.accent};border-color:${activeHero.accent}55">
+            ${SKILL_ICONS[skill.id] || ''}
+          </div>
+          <div class="hero-skill-meta">
+            <div class="hero-skill-title">
+              <span>Abilità: ${skill.name}</span>
+              <span class="hero-skill-cd">${skill.cooldownSec}s CD</span>
+            </div>
+            <div class="hero-skill-desc">${skill.description}</div>
+          </div>
+        `;
+      } else {
+        el.heroActiveSkillBox.innerHTML = '';
+      }
+    }
+
     if (el.heroPerksActive) {
       el.heroPerksActive.textContent =
         activePerks.activeLabels.length > 0
@@ -494,6 +576,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
 
   renderRealmSelection();
+  renderChallengeSelection();
   renderHeroSelection();
   renderTitleRecords();
   updateCodexButtonLabel();
@@ -602,6 +685,26 @@ window.addEventListener('DOMContentLoaded', async () => {
           el.hudBuffBar.textContent = `${data.buff.label} · ${Math.max(1, Math.ceil(data.buff.remaining))}s`;
         } else {
           el.hudBuffBar.classList.add('hidden');
+        }
+      }
+      if (el.activeSkillBtn && data.activeSkill) {
+        const sk = data.activeSkill;
+        el.activeSkillBtn.style.setProperty('--skill-accent', sk.accent || '#f59e0b');
+        el.activeSkillBtn.classList.toggle('is-ready', Boolean(sk.ready));
+        el.activeSkillBtn.classList.toggle('is-cooldown', !sk.ready);
+        el.activeSkillBtn.classList.toggle('is-active', (sk.activeTimer || 0) > 0);
+        if (el.activeSkillIcon) {
+          el.activeSkillIcon.innerHTML = SKILL_ICONS[sk.id] || '';
+        }
+        if (el.activeSkillLabel) {
+          el.activeSkillLabel.textContent = sk.ready
+            ? (sk.shortName || 'ATTIVA')
+            : `${Math.ceil(sk.cooldownRemaining)}s`;
+        }
+        if (el.activeSkillRing) {
+          const circ = 157.08;
+          const ratio = sk.ready ? 0 : Math.min(1, Math.max(0, sk.cooldownRemaining / Math.max(1, sk.maxCooldown)));
+          el.activeSkillRing.style.strokeDashoffset = (circ * ratio).toFixed(2);
         }
       }
     },
@@ -728,6 +831,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       const codexUpdate = recordRunCodexProgress(result);
       renderRealmSelection();
+      renderChallengeSelection();
       renderTitleRecords();
       renderHeroSelection();
       updateCodexButtonLabel();
@@ -825,6 +929,29 @@ window.addEventListener('DOMContentLoaded', async () => {
           el.endCodexUnlocks.classList.remove('hidden');
         } else {
           el.endCodexUnlocks.classList.add('hidden');
+        }
+      }
+      if (el.endDamageCard && el.endDamageList) {
+        const rows = Array.isArray(result.damageBreakdown) ? result.damageBreakdown : [];
+        if (rows.length > 0) {
+          el.endDamageList.innerHTML = rows
+            .map(
+              (row) => `
+              <div class="damage-row">
+                <div class="damage-row-head">
+                  <span class="damage-row-name" style="color:${row.accent}">${row.name}</span>
+                  <span class="damage-row-val">${row.damage.toLocaleString('it-IT')} (${row.percent}%)</span>
+                </div>
+                <div class="damage-bar-track">
+                  <div class="damage-bar-fill" style="width:${Math.max(4, row.percent)}%;background:${row.accent}"></div>
+                </div>
+              </div>`
+            )
+            .join('');
+          el.endDamageCard.classList.remove('hidden');
+        } else {
+          el.endDamageCard.classList.add('hidden');
+          el.endDamageList.innerHTML = '';
         }
       }
 
@@ -938,6 +1065,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     gameScene.pauseGame(false);
   });
 
+  el.activeSkillBtn?.addEventListener('pointerdown', (ev) => {
+    ev.stopPropagation();
+  });
+  el.activeSkillBtn?.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    audio.unlock();
+    gameScene.triggerActiveSkill();
+  });
+
   el.resumeBtn?.addEventListener('click', () => {
     audio.playUiClick();
     bridge.onPauseChanged(false);
@@ -962,6 +1098,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     gameScene.gameState = 'IDLE';
     gameScene.physics.pause();
     renderRealmSelection();
+    renderChallengeSelection();
     renderHeroSelection();
     renderTitleRecords();
     updateCodexButtonLabel();
@@ -970,7 +1107,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   el.quitBtn?.addEventListener('click', returnToTitle);
   el.endTitleBtn?.addEventListener('click', returnToTitle);
 
-  // Tasto ESC o P per mettere in pausa su desktop
+  // Tasto ESC o P per mettere in pausa e Spazio/E per Abilità Attiva su desktop
   window.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape' || ev.key === 'p' || ev.key === 'P') {
       if (gameScene.gameState === 'PLAYING') {
@@ -979,6 +1116,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         bridge.onPauseChanged(false);
         gameScene.resumeGame();
       }
+    } else if ((ev.code === 'Space' || ev.key === 'e' || ev.key === 'E') && gameScene.gameState === 'PLAYING') {
+      ev.preventDefault();
+      audio.unlock();
+      gameScene.triggerActiveSkill();
     }
   });
 

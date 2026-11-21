@@ -7,7 +7,8 @@
 
 import { audio } from './audio.js';
 import { generateHdTextures } from './hdSprites.js';
-import { getRealmConfig, getRealmDialogue } from './realms.js';
+import { getRealmConfig, getRealmDialogue, getChallengeConfig } from './realms.js';
+import { HERO_ROSTER } from './heroes.js';
 
 export const GAME_CONFIG = {
   // Durata della run prima dell'arrivo del Boss Finale (240s = 4 minuti)
@@ -152,6 +153,76 @@ export const UPGRADE_CATALOG = [
     ]
   },
   {
+    id: 'spear',
+    type: 'weapon',
+    name: 'Lancia di Odino',
+    maxLevel: 5,
+    accent: '#fbbf24',
+    desc: [
+      'Scaglia una lancia celeste ad alta velocità che trafigge i nemici in linea.',
+      '+1 Perforazione e +25% Danno.',
+      '+1 Lancia parallela per raffica.',
+      'Velocità supersonica e ricarica più rapida.',
+      'Raffica dorata: 3 lance perforanti ad alto critico.'
+    ]
+  },
+  {
+    id: 'scythe',
+    type: 'weapon',
+    name: 'Falci del Crepuscolo',
+    maxLevel: 5,
+    accent: '#c084fc',
+    desc: [
+      'Lancia una falce rotante che torna indietro come un boomerang.',
+      '+20% Danno e raggio di volo esteso.',
+      '+1 Falce lanciata in direzioni opposte.',
+      'Ritorno più rapido e +25% Danno.',
+      'Tempesta rotante: 3 falci cremisi a doppio passaggio.'
+    ]
+  },
+  {
+    id: 'fangs',
+    type: 'weapon',
+    name: 'Spine d’Ombra',
+    maxLevel: 5,
+    accent: '#d8b4fe',
+    desc: [
+      'Dardi oscuri che rimbalzano sul nemico vicino dopo ogni impatto.',
+      '+1 Rimbalzo aggiuntivo e +20% Danno.',
+      '+1 Spina scagliata per salva.',
+      '+1 Rimbalzo extra e ricarica più veloce.',
+      'Sciame di cristallo: 3 spine con 4 rimbalzi ciascuna.'
+    ]
+  },
+  {
+    id: 'grimoire',
+    type: 'weapon',
+    name: 'Grimorio Astrale',
+    maxLevel: 5,
+    accent: '#60a5fa',
+    desc: [
+      'Evoca un pilastro runico esplosivo sotto i gruppi di nemici.',
+      '+25% Area del sigillo e +25% Danno.',
+      '+1 Pilastro astrale per invocazione.',
+      'Ricarica ridotta e onde d’urto potenziate.',
+      'Cataclisma: 3 pilastri simultanei ad alto potenziale.'
+    ]
+  },
+  {
+    id: 'flail',
+    type: 'weapon',
+    name: 'Flagello a Catena',
+    maxLevel: 5,
+    accent: '#fb7185',
+    desc: [
+      'Fa roteare una sfera ferrata a catena attorno all’eroe spazzando i nemici.',
+      '+20% Portata della catena e +25% Danno.',
+      'Rotazione più ampia e ricarica più rapida.',
+      '+30% Danno e contraccolpo pesante.',
+      'Spazzata totale a 360° con doppia sfera.'
+    ]
+  },
+  {
     id: 'might',
     type: 'passive',
     name: 'Furia di Tyr',
@@ -279,6 +350,46 @@ export const WEAPON_EVOLUTIONS = {
     name: 'Maglio Spezzamondi',
     accent: '#fb923c',
     description: 'EVOLUZIONE · Onda sismica gigante con fessure critiche dorate.'
+  },
+  spear: {
+    id: 'evo_spear',
+    weaponId: 'spear',
+    passiveId: 'swift',
+    name: 'Gungnir Eterna',
+    accent: '#fde047',
+    description: 'EVOLUZIONE · 4 lance celesti inarrestabili che non mancano il bersaglio.'
+  },
+  scythe: {
+    id: 'evo_scythe',
+    weaponId: 'scythe',
+    passiveId: 'might',
+    name: 'Eclissi Cremisi',
+    accent: '#e879f9',
+    description: 'EVOLUZIONE · 4 falci giganti a ritorno veloce con danno critico aumentato.'
+  },
+  fangs: {
+    id: 'evo_fangs',
+    weaponId: 'fangs',
+    passiveId: 'area',
+    name: 'Tempesta di Hel',
+    accent: '#c084fc',
+    description: 'EVOLUZIONE · 4 spine oscure con 6 rimbalzi letali.'
+  },
+  grimoire: {
+    id: 'evo_grimoire',
+    weaponId: 'grimoire',
+    passiveId: 'regen',
+    name: 'Cataclisma di Yggdrasil',
+    accent: '#38bdf8',
+    description: 'EVOLUZIONE · 5 pilastri astrali devastanti con onda d’urto estesa.'
+  },
+  flail: {
+    id: 'evo_flail',
+    weaponId: 'flail',
+    passiveId: 'area',
+    name: 'Catena di Fenrir',
+    accent: '#fb7185',
+    description: 'EVOLUZIONE · Doppia sfera infuocata a rotazione continua attorno all’eroe.'
   }
 };
 
@@ -524,6 +635,8 @@ export class GameScene extends Phaser.Scene {
     this.activeWeaponId = runConfig.startingWeaponId || 'axe';
     this.activeRealmId = runConfig.realmId || 'midgard';
     this.activeRealm = getRealmConfig(this.activeRealmId);
+    this.activeChallengeId = runConfig.challengeId || 'standard';
+    this.activeChallenge = getChallengeConfig(this.activeChallengeId);
     this.triggeredDialogues = new Set();
     this.bossHalfHpTriggered = false;
     this.bossAttackStep = 0;
@@ -563,6 +676,14 @@ export class GameScene extends Phaser.Scene {
     this.cratesBroken = 0;
     this.shrinesActivated = 0;
     this.evolutionsForged = 0;
+    this.skillsUsed = 0;
+    this.encounteredEnemies = new Set();
+    this.weaponDamageStats = {};
+    this.activeSkillCooldown = 0;
+    this.activeSkillBuffTimer = 0;
+    this.ironSkinTimer = 0;
+    this.activeFlailSwing = null;
+    this.activeAstralPillars = [];
     this.miniBossSchedule = [60, 120, 180];
     this.nextMiniBossIdx = 0;
     this.activeMiniBoss = null;
@@ -610,6 +731,11 @@ export class GameScene extends Phaser.Scene {
       dagger: 0,
       orb: 0,
       hammer: 0,
+      spear: 0,
+      scythe: 0,
+      fangs: 0,
+      grimoire: 0,
+      flail: 0,
       might: 0,
       swift: 0,
       area: 0,
@@ -630,6 +756,11 @@ export class GameScene extends Phaser.Scene {
       dagger: 0.25,
       orb: 0.35,
       hammer: 0.4,
+      spear: 0.35,
+      scythe: 0.4,
+      fangs: 0.3,
+      grimoire: 0.55,
+      flail: 0.45,
       bladeAngle: 0,
       bossAttack: 2.8
     };
@@ -715,9 +846,10 @@ export class GameScene extends Phaser.Scene {
   _recomputeStatsFromLevels() {
     const furyBonus = this.activeBuff?.id === 'fury' ? 0.35 : 0;
     const swiftBonus = this.activeBuff?.id === 'frost_shield' ? 0.25 : 0;
+    const skillSpeedBonus = this.activeSkillBuffTimer > 0 ? 0.35 : 0;
 
     this.stats.mightMult = this.baseRunStats.mightMult + this.levels.might * 0.18 + furyBonus;
-    this.stats.speedMult = 1 + this.levels.swift * 0.12 + swiftBonus;
+    this.stats.speedMult = 1 + this.levels.swift * 0.12 + swiftBonus + skillSpeedBonus;
     this.stats.areaMult = this.baseRunStats.areaMult + this.levels.area * 0.16;
     this.stats.magnetRadius = Math.round(84 * this.baseRunStats.magnetMult * (1 + this.levels.magnet * 0.35));
 
@@ -747,6 +879,152 @@ export class GameScene extends Phaser.Scene {
       });
   }
 
+  _getDamageBreakdown() {
+    const entries = Object.entries(this.weaponDamageStats || {}).filter(([, dmg]) => dmg > 0);
+    const total = entries.reduce((sum, [, dmg]) => sum + dmg, 0);
+    return entries
+      .map(([id, damage]) => {
+        const evo = this.evolvedWeapons?.[id] ? WEAPON_EVOLUTIONS[id] : null;
+        const upg = UPGRADE_CATALOG.find((u) => u.id === id);
+        let name = evo?.name || upg?.name;
+        let accent = evo?.accent || upg?.accent || '#f59e0b';
+        if (!name && id.startsWith('skill_')) {
+          const heroSkill = Object.values(HERO_ROSTER).find((h) => h.activeSkill?.id === id)?.activeSkill;
+          name = heroSkill ? `${heroSkill.name} (Abilità)` : 'Abilità Attiva';
+          accent = heroSkill?.accent || '#38bdf8';
+        }
+        return {
+          id,
+          name: name || id,
+          accent,
+          damage: Math.round(damage),
+          percent: total > 0 ? Math.round((damage / total) * 100) : 0
+        };
+      })
+      .sort((a, b) => b.damage - a.damage);
+  }
+
+  triggerActiveSkill() {
+    if (this.gameState !== 'PLAYING') return false;
+    if (this.activeSkillCooldown > 0) return false;
+    const hero = HERO_ROSTER[this.activeHeroId] || HERO_ROSTER.warrior;
+    const skill = hero.activeSkill;
+    if (!skill) return false;
+
+    this.activeSkillCooldown = skill.cooldownSec;
+    this.skillsUsed = (this.skillsUsed || 0) + 1;
+    audio.playActiveSkill(this.activeHeroId);
+
+    const hx = this.hero.x;
+    const hy = this.hero.y;
+    const areaM = this.stats.areaMult || 1;
+    const mightM = this.stats.mightMult || 1;
+
+    if (skill.id === 'skill_valkyrie_leap') {
+      const r = 145 * areaM;
+      const rSq = r * r;
+      const dmg = Math.round(52 * mightM);
+      this.activeSkillBuffTimer = 2.2;
+      this._recomputeStatsFromLevels();
+      this.activeExplosions.push({ x: hx, y: hy, maxR: r, life: 0, dur: 0.36, color: 0xfbbf24 });
+      this._emitSparks(hx, hy, 18, 0xfbbf24, 190);
+      this.cameras.main.shake(150, 0.006);
+      for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
+        const e = this.activeEnemies[i];
+        if (!e.active) continue;
+        const dx = e.x - hx;
+        const dy = e.y - hy;
+        if (dx * dx + dy * dy <= rSq) {
+          e.freezeTimer = Math.max(e.freezeTimer || 0, 1.4);
+          this._damageEnemy(e, dmg, dx, dy, e.isBoss ? 25 : 190, true, 0xfbbf24, skill.id, true);
+        }
+      }
+      this._damageCratesInRadius(hx, hy, r);
+    } else if (skill.id === 'skill_shadow_step') {
+      this.stats.invulnTimer = Math.max(this.stats.invulnTimer, 0.95);
+      const moveX = this.hero.body.velocity.x;
+      const moveY = this.hero.body.velocity.y;
+      const dashAng = (Math.hypot(moveX, moveY) > 10)
+        ? Math.atan2(moveY, moveX)
+        : (this.hero.flipX ? Math.PI : 0);
+      const stepDist = 105;
+      this._emitSparks(hx, hy, 12, 0xe879f9, 130);
+      this.hero.setPosition(hx + Math.cos(dashAng) * stepDist, hy + Math.sin(dashAng) * stepDist);
+      this._resolvePropCollisions();
+      this._emitSparks(this.hero.x, this.hero.y, 16, 0xf0abfc, 160);
+
+      const fanCount = 10;
+      const dmg = Math.round(28 * mightM);
+      for (let i = 0; i < fanCount; i++) {
+        const ang = (i / fanCount) * Math.PI * 2;
+        const proj = this.projPool.get(this.hero.x, this.hero.y, 'dagger_proj');
+        if (!proj) break;
+        proj.setTexture('dagger_proj');
+        proj.clearTint();
+        proj.setTintFill(0xf0abfc);
+        proj.enableBody(true, this.hero.x, this.hero.y, true, true);
+        proj.baseScale = this.hdMode ? 0.36 : 1.15;
+        proj.setScale(proj.baseScale);
+        proj.setRotation(ang);
+        proj.setDepth(DEPTH_LAYERS.VFX - 10);
+        proj.setVelocity(Math.cos(ang) * 490, Math.sin(ang) * 490);
+        proj.kind = 'dagger';
+        proj.sourceId = skill.id;
+        proj.evolved = true;
+        proj.damage = dmg;
+        proj.pierce = 3;
+        proj.life = 0.85;
+        proj.trailTimer = 0;
+        if (!proj.hitSet) proj.hitSet = new Set();
+        else proj.hitSet.clear();
+        if (!this.activeProjectiles.includes(proj)) this.activeProjectiles.push(proj);
+      }
+    } else if (skill.id === 'skill_rune_rupture') {
+      const r = 175 * areaM;
+      const rSq = r * r;
+      const dmg = Math.round(46 * mightM);
+      this.activeExplosions.push({ x: hx, y: hy, maxR: r, life: 0, dur: 0.42, color: 0x38bdf8 });
+      this._emitSparks(hx, hy, 22, 0x7dd3fc, 200);
+      this.cameras.main.shake(130, 0.005);
+      for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
+        const e = this.activeEnemies[i];
+        if (!e.active) continue;
+        const dx = e.x - hx;
+        const dy = e.y - hy;
+        if (dx * dx + dy * dy <= rSq) {
+          e.freezeTimer = Math.max(e.freezeTimer || 0, 3.0);
+          e.setTintFill(0x7dd3fc);
+          this._damageEnemy(e, dmg, dx, dy, 80, false, 0x38bdf8, skill.id, true);
+        }
+      }
+      for (const g of this.activeGems) {
+        if (g.active) g.magnetized = true;
+      }
+      this._damageCratesInRadius(hx, hy, r);
+    } else if (skill.id === 'skill_iron_skin') {
+      this.ironSkinTimer = 4.0;
+      const r = 150 * areaM;
+      const rSq = r * r;
+      const dmg = Math.round(62 * mightM);
+      this.activeExplosions.push({ x: hx, y: hy, maxR: r, life: 0, dur: 0.36, color: 0xfb923c });
+      this._emitSparks(hx, hy, 20, 0xfb923c, 190);
+      this.cameras.main.shake(180, 0.0075);
+      for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
+        const e = this.activeEnemies[i];
+        if (!e.active) continue;
+        const dx = e.x - hx;
+        const dy = e.y - hy;
+        if (dx * dx + dy * dy <= rSq) {
+          this._damageEnemy(e, dmg, dx, dy, e.isBoss ? 25 : 210, true, 0xfb923c, skill.id, true);
+        }
+      }
+      this._damageCratesInRadius(hx, hy, r);
+    }
+
+    this._syncHud();
+    return true;
+  }
+
   update(_time, deltaMs) {
     if (this.gameState !== 'PLAYING') return;
 
@@ -756,9 +1034,22 @@ export class GameScene extends Phaser.Scene {
     // 1. Movimento Eroe
     this._updateHeroMovement(dt);
 
-    // 2. Rigenerazione e Invulnerabilità
+    // 2. Rigenerazione, Invulnerabilità e Cooldown Abilità Attiva
     if (this.stats.regenPerSec > 0 && this.stats.hp < this.stats.maxHp) {
       this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + this.stats.regenPerSec * dt);
+    }
+    if (this.activeSkillCooldown > 0) {
+      this.activeSkillCooldown = Math.max(0, this.activeSkillCooldown - dt);
+    }
+    if (this.activeSkillBuffTimer > 0) {
+      this.activeSkillBuffTimer -= dt;
+      if (this.activeSkillBuffTimer <= 0) {
+        this.activeSkillBuffTimer = 0;
+        this._recomputeStatsFromLevels();
+      }
+    }
+    if (this.ironSkinTimer > 0) {
+      this.ironSkinTimer = Math.max(0, this.ironSkinTimer - dt);
     }
     if (this.stats.invulnTimer > 0) {
       this.stats.invulnTimer -= dt;
@@ -817,6 +1108,10 @@ export class GameScene extends Phaser.Scene {
 
     // 5. Armi, altari/casse, nemici, proiettili nemici ed effetti grafici a 60 FPS
     this.auraGfx.clear();
+    if (this.ironSkinTimer > 0) {
+      this.auraGfx.lineStyle(3, 0xfb923c, 0.78);
+      this.auraGfx.strokeCircle(this.hero.x, this.hero.y + 4, 24);
+    }
     this._updateCratesAndShrines(dt);
     this._updateWeapons(dt);
     this._updateEnemiesAndBoss(dt);
@@ -989,29 +1284,38 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Ondate bilanciate: ritmo leggibile e progressivo senza saturare i primi minuti
+   * Ondate bilanciate: ritmo leggibile e progressivo con 4 nuovi archetipi e modificatori sfida
    */
   _updateSpawning(dt, waveIdx) {
     this.timers.spawn -= dt;
     if (this.timers.spawn > 0) return;
 
-    const interval = Math.max(0.24, 0.92 - waveIdx * 0.065);
+    const spawnMult = this.activeChallenge?.spawnMult || 1.0;
+    const interval = Math.max(0.18, (0.92 - waveIdx * 0.065) / spawnMult);
     this.timers.spawn = interval;
 
     const batchCount = this.bossSpawned
       ? 1
-      : Math.min(4, 1 + Math.floor(waveIdx * 0.5));
+      : Math.min(5, Math.max(1, Math.round((1 + Math.floor(waveIdx * 0.5)) * (spawnMult > 1.3 ? 1.25 : 1))));
 
     for (let i = 0; i < batchCount; i++) {
       if (this.activeEnemies.length >= GAME_CONFIG.MAX_ENEMIES) break;
 
       let archetype = 'swarm';
       const roll = Math.random();
-      if (waveIdx >= 1 && roll < 0.2) archetype = 'fast';
-      if (waveIdx >= 1 && roll >= 0.2 && roll < 0.34) archetype = 'archer';
-      if (waveIdx >= 2 && roll >= 0.72 && roll < 0.84) archetype = 'berserker';
-      if (waveIdx >= 2 && roll >= 0.84) archetype = 'tank';
-      if (waveIdx >= 5 && roll >= 0.68) archetype = 'tank';
+      if (waveIdx >= 1) {
+        if (roll < 0.16) archetype = 'fast';
+        else if (roll < 0.28) archetype = 'archer';
+        else if (roll < 0.40) archetype = 'stalker';
+      }
+      if (waveIdx >= 2) {
+        if (roll >= 0.40 && roll < 0.50) archetype = 'bomber';
+        else if (roll >= 0.50 && roll < 0.59) archetype = 'shaman';
+        else if (roll >= 0.59 && roll < 0.69) archetype = 'shieldbearer';
+        else if (roll >= 0.69 && roll < 0.83) archetype = 'berserker';
+        else if (roll >= 0.83) archetype = 'tank';
+      }
+      if (waveIdx >= 5 && roll >= 0.72) archetype = roll >= 0.86 ? 'tank' : 'shieldbearer';
 
       this._spawnEnemy(archetype, waveIdx);
     }
@@ -1034,6 +1338,7 @@ export class GameScene extends Phaser.Scene {
     const sy = this.hero.y + Math.sin(angle) * spawnDist;
 
     const realm = this.activeRealm || getRealmConfig('midgard');
+    const ch = this.activeChallenge || getChallengeConfig('standard');
     const texKey = realm.enemyTexMap?.[archetype] || 'enemy_swarm';
 
     const enemy = this.enemyPool.get(sx, sy, texKey);
@@ -1046,24 +1351,46 @@ export class GameScene extends Phaser.Scene {
     enemy.setAlpha(1);
     enemy.setVisible(true);
 
-    const hpScale = (1 + waveIdx * 0.25) * (realm.hpMult || 1.0);
-    const speedScale = (1 + Math.min(0.45, waveIdx * 0.04)) * (realm.speedMult || 1.0);
+    const hpScale = (1 + waveIdx * 0.25) * (realm.hpMult || 1.0) * (ch.hpMult || 1.0);
+    const speedScale = (1 + Math.min(0.45, waveIdx * 0.04)) * (realm.speedMult || 1.0) * (ch.speedMult || 1.0);
+
+    // Reset stati AI specifici dell'archetipo
+    enemy.summonCooldown = 0;
+    enemy.summonWindup = 0;
+    enemy.summonCount = 0;
+    enemy.bomberTriggered = false;
+    enemy.dashCooldown = 0;
+    enemy.dashTime = 0;
+    enemy.dashVx = 0;
+    enemy.dashVy = 0;
+    enemy.freezeTimer = 0;
 
     if (archetype === 'tank') {
       enemy.baseScale = this.hdMode ? 0.363 : 1.34;
       enemy.setScale(enemy.baseScale);
-      enemy.maxHp = Math.round(90 * hpScale);
+      enemy.maxHp = Math.round(140 * hpScale);
       enemy.speed = 48 * speedScale;
       enemy.damage = 16;
-      enemy.xpValue = 5;
+      enemy.xpValue = 6;
       const hbW = this.hdMode ? 70 : 24;
       const hbH = this.hdMode ? 42 : 15;
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
+    } else if (archetype === 'shieldbearer') {
+      enemy.baseScale = this.hdMode ? 0.355 : 1.30;
+      enemy.setScale(enemy.baseScale);
+      enemy.maxHp = Math.round(135 * hpScale);
+      enemy.speed = 46 * speedScale;
+      enemy.damage = 15;
+      enemy.xpValue = 6;
+      const hbW = this.hdMode ? 64 : 22;
+      const hbH = this.hdMode ? 38 : 14;
       enemy.body.setSize(hbW, hbH);
       enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
     } else if (archetype === 'fast') {
       enemy.baseScale = this.hdMode ? 0.330 : 1.19;
       enemy.setScale(enemy.baseScale);
-      enemy.maxHp = Math.round(26 * hpScale);
+      enemy.maxHp = Math.round(38 * hpScale);
       enemy.speed = 96 * speedScale;
       enemy.damage = 10;
       enemy.xpValue = 3;
@@ -1074,7 +1401,7 @@ export class GameScene extends Phaser.Scene {
     } else if (archetype === 'archer') {
       enemy.baseScale = this.hdMode ? 0.322 : 1.18;
       enemy.setScale(enemy.baseScale);
-      enemy.maxHp = Math.round(28 * hpScale);
+      enemy.maxHp = Math.round(42 * hpScale);
       enemy.speed = 62 * speedScale;
       enemy.damage = 10;
       enemy.xpValue = 4;
@@ -1084,10 +1411,45 @@ export class GameScene extends Phaser.Scene {
       const hbH = this.hdMode ? 32 : 11;
       enemy.body.setSize(hbW, hbH);
       enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
+    } else if (archetype === 'shaman') {
+      enemy.baseScale = this.hdMode ? 0.338 : 1.24;
+      enemy.setScale(enemy.baseScale);
+      enemy.maxHp = Math.round(64 * hpScale);
+      enemy.speed = 54 * speedScale;
+      enemy.damage = 11;
+      enemy.xpValue = 6;
+      enemy.summonCooldown = 2.4 + Math.random() * 1.4;
+      const hbW = this.hdMode ? 56 : 20;
+      const hbH = this.hdMode ? 34 : 12;
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
+    } else if (archetype === 'bomber') {
+      enemy.baseScale = this.hdMode ? 0.330 : 1.22;
+      enemy.setScale(enemy.baseScale);
+      enemy.maxHp = Math.round(48 * hpScale);
+      enemy.speed = 76 * speedScale;
+      enemy.damage = 14;
+      enemy.xpValue = 5;
+      const hbW = this.hdMode ? 56 : 19;
+      const hbH = this.hdMode ? 34 : 12;
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
+    } else if (archetype === 'stalker') {
+      enemy.baseScale = this.hdMode ? 0.332 : 1.22;
+      enemy.setScale(enemy.baseScale);
+      enemy.maxHp = Math.round(52 * hpScale);
+      enemy.speed = 84 * speedScale;
+      enemy.damage = 13;
+      enemy.xpValue = 5;
+      enemy.dashCooldown = 1.8 + Math.random();
+      const hbW = this.hdMode ? 56 : 19;
+      const hbH = this.hdMode ? 34 : 12;
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(Math.max(0, (enemy.width - hbW) / 2), Math.max(0, enemy.height - hbH - 3));
     } else if (archetype === 'berserker') {
       enemy.baseScale = this.hdMode ? 0.345 : 1.28;
       enemy.setScale(enemy.baseScale);
-      enemy.maxHp = Math.round(58 * hpScale);
+      enemy.maxHp = Math.round(88 * hpScale);
       enemy.speed = 70 * speedScale;
       enemy.damage = 15;
       enemy.xpValue = 6;
@@ -1115,6 +1477,7 @@ export class GameScene extends Phaser.Scene {
 
     enemy.hp = enemy.maxHp;
     enemy.archetype = archetype;
+    enemy.waveIdx = waveIdx;
     enemy.isBoss = false;
     enemy.isMiniBoss = false;
     enemy.knockbackTimer = 0;
@@ -1123,20 +1486,23 @@ export class GameScene extends Phaser.Scene {
     enemy.walkPhase = Math.random() * 4;
     enemy.setDepth(computeEntityDepth(sy));
 
-    const shOffset = archetype === 'tank' ? 23 : 15;
+    this.encounteredEnemies?.add(archetype);
+
+    const shOffset = (archetype === 'tank' || archetype === 'shieldbearer') ? 23 : 15;
     if (!enemy.shadow) {
       enemy.shadow = this.add.image(sx, sy + shOffset, 'shadow_ellipse').setDepth(DEPTH_LAYERS.SHADOWS).setAlpha(0.42);
     } else {
       enemy.shadow.setPosition(sx, sy + shOffset).setVisible(true).setDepth(DEPTH_LAYERS.SHADOWS);
     }
     const shScale = this.hdMode
-      ? archetype === 'tank' ? 0.38 : 0.28
-      : archetype === 'tank' ? 1.54 : 1.08;
+      ? (archetype === 'tank' || archetype === 'shieldbearer') ? 0.38 : 0.28
+      : (archetype === 'tank' || archetype === 'shieldbearer') ? 1.54 : 1.08;
     enemy.shadow.setScale(shScale);
 
     if (!this.activeEnemies.includes(enemy)) {
       this.activeEnemies.push(enemy);
     }
+    return enemy;
   }
 
   _spawnMiniBoss(idx = 0) {
@@ -1151,6 +1517,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const realm = this.activeRealm || getRealmConfig('midgard');
+    const ch = this.activeChallenge || getChallengeConfig('standard');
     const eliteKey = realm.enemyTexMap?.elite || 'enemy_elite';
     const elite = this.enemyPool.get(bx, by, eliteKey);
     if (!elite) return;
@@ -1166,14 +1533,15 @@ export class GameScene extends Phaser.Scene {
     elite.isBoss = false;
     elite.isMiniBoss = true;
     elite.archetype = 'elite';
-    elite.maxHp = Math.round((420 + idx * 240) * (realm.hpMult || 1.0));
+    elite.maxHp = Math.round((620 + idx * 340) * (realm.hpMult || 1.0) * (ch.hpMult || 1.0));
     elite.hp = elite.maxHp;
-    elite.speed = Math.round((66 + idx * 4) * (realm.speedMult || 1.0));
+    elite.speed = Math.round((66 + idx * 4) * (realm.speedMult || 1.0) * (ch.speedMult || 1.0));
     elite.damage = 20;
     elite.xpValue = 25;
     elite.knockbackTimer = 0;
     elite.flashTimer = 0;
     elite.bladeCooldown = 0;
+    elite.freezeTimer = 0;
     elite.walkPhase = 0;
     elite.setDepth(computeEntityDepth(by));
 
@@ -1234,6 +1602,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const realm = this.activeRealm || getRealmConfig('midgard');
+    const ch = this.activeChallenge || getChallengeConfig('standard');
     const bossCfg = realm.boss;
     const bossTex = realm.enemyTexMap?.boss || 'boss';
     const boss = this.enemyPool.get(bx, by, bossTex);
@@ -1250,9 +1619,9 @@ export class GameScene extends Phaser.Scene {
     boss.isBoss = true;
     boss.isMiniBoss = false;
     boss.archetype = 'boss';
-    boss.maxHp = bossCfg.maxHp;
+    boss.maxHp = Math.round(bossCfg.maxHp * (ch.hpMult || 1.0));
     boss.hp = boss.maxHp;
-    boss.speed = bossCfg.speed;
+    boss.speed = Math.round(bossCfg.speed * (ch.speedMult || 1.0));
     boss.damage = bossCfg.damage;
     boss.displayName = bossCfg.name;
     boss.attackProfile = bossCfg.attackProfile;
@@ -1260,6 +1629,7 @@ export class GameScene extends Phaser.Scene {
     boss.knockbackTimer = 0;
     boss.flashTimer = 0;
     boss.bladeCooldown = 0;
+    boss.freezeTimer = 0;
     boss.walkPhase = 0;
     boss.setDepth(computeEntityDepth(by));
 
@@ -1323,7 +1693,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // ARMA 7: Martello Sismico (Bjorn / sbloccabile)
+    // ARMA 7: Martello Sismico (Bjorn)
     const hammerLv = this.levels.hammer;
     if (hammerLv > 0) {
       this.timers.hammer -= dt;
@@ -1332,6 +1702,64 @@ export class GameScene extends Phaser.Scene {
         this.timers.hammer = this.evolvedWeapons.hammer ? 0.72 : cds[hammerLv];
         this._fireSeismicHammer(hammerLv);
       }
+    }
+
+    // ARMA 8: Lancia di Odino (Astrid)
+    const spearLv = this.levels.spear;
+    if (spearLv > 0) {
+      this.timers.spear -= dt;
+      if (this.timers.spear <= 0) {
+        const cds = [0, 1.12, 1.0, 0.9, 0.78, 0.65];
+        this.timers.spear = this.evolvedWeapons.spear ? 0.54 : cds[spearLv];
+        this._fireOdinSpears(spearLv);
+      }
+    }
+
+    // ARMA 9: Falci del Crepuscolo (Skadi)
+    const scytheLv = this.levels.scythe;
+    if (scytheLv > 0) {
+      this.timers.scythe -= dt;
+      if (this.timers.scythe <= 0) {
+        const cds = [0, 1.35, 1.2, 1.08, 0.96, 0.82];
+        this.timers.scythe = this.evolvedWeapons.scythe ? 0.68 : cds[scytheLv];
+        this._fireTwilightScythes(scytheLv);
+      }
+    }
+
+    // ARMA 10: Spine d'Ombra (Skadi)
+    const fangsLv = this.levels.fangs;
+    if (fangsLv > 0) {
+      this.timers.fangs -= dt;
+      if (this.timers.fangs <= 0) {
+        const cds = [0, 0.82, 0.74, 0.66, 0.58, 0.48];
+        this.timers.fangs = this.evolvedWeapons.fangs ? 0.4 : cds[fangsLv];
+        this._fireShadowFangs(fangsLv);
+      }
+    }
+
+    // ARMA 11: Grimorio Astrale (Freya)
+    const grimoireLv = this.levels.grimoire;
+    if (grimoireLv > 0) {
+      this.timers.grimoire -= dt;
+      if (this.timers.grimoire <= 0) {
+        const cds = [0, 1.65, 1.48, 1.32, 1.18, 1.02];
+        this.timers.grimoire = this.evolvedWeapons.grimoire ? 0.85 : cds[grimoireLv];
+        this._castAstralGrimoire(grimoireLv);
+      }
+    }
+
+    // ARMA 12: Flagello a Catena (Bjorn)
+    const flailLv = this.levels.flail;
+    if (flailLv > 0) {
+      this.timers.flail -= dt;
+      if (this.timers.flail <= 0) {
+        const cds = [0, 1.25, 1.12, 0.98, 0.86, 0.74];
+        this.timers.flail = this.evolvedWeapons.flail ? 0.62 : cds[flailLv];
+        this._triggerChainFlail(flailLv);
+      }
+    }
+    if (this.activeFlailSwing) {
+      this._updateFlailSwing(dt);
     }
 
     // ARMA 2: Aura del Crepuscolo / Manto di Surtr
@@ -1384,7 +1812,7 @@ export class GameScene extends Phaser.Scene {
           const dx = e.x - cx;
           const dy = e.y - cy;
           if (dx * dx + dy * dy <= rSq) {
-            this._damageEnemy(e, auraDmg, dx, dy, e.isBoss ? 15 : 95, false, ringCol);
+            this._damageEnemy(e, auraDmg, dx, dy, e.isBoss ? 15 : 95, false, ringCol, 'aura', true);
             hitAny = true;
           }
         }
@@ -1452,7 +1880,9 @@ export class GameScene extends Phaser.Scene {
               e.y - this.hero.y,
               115,
               isCrit,
-              evoBlades ? 0xfde047 : 0xbae6fd
+              evoBlades ? 0xfde047 : 0xbae6fd,
+              'blades',
+              false
             );
           }
         }
@@ -1548,6 +1978,7 @@ export class GameScene extends Phaser.Scene {
       proj.setDepth(DEPTH_LAYERS.VFX - 10);
       proj.setVelocity(Math.cos(baseAng) * speed, Math.sin(baseAng) * speed);
       proj.kind = 'axe';
+      proj.sourceId = 'axe';
       proj.evolved = evo;
       proj.damage = dmg;
       proj.pierce = pierce;
@@ -1597,6 +2028,7 @@ export class GameScene extends Phaser.Scene {
       proj.setDepth(DEPTH_LAYERS.VFX - 10);
       proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
       proj.kind = 'dagger';
+      proj.sourceId = 'dagger';
       proj.evolved = evo;
       proj.damage = dmg;
       proj.pierce = pierce;
@@ -1641,6 +2073,7 @@ export class GameScene extends Phaser.Scene {
       proj.setDepth(DEPTH_LAYERS.VFX - 8);
       proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
       proj.kind = 'orb';
+      proj.sourceId = 'orb';
       proj.evolved = evo;
       proj.damage = dmg;
       proj.blastRadius = blastRadius;
@@ -1683,10 +2116,263 @@ export class GameScene extends Phaser.Scene {
         if (dx * dx + dy * dy <= rSq) {
           const isCrit = evo && Math.random() < 0.3;
           const finalDmg = isCrit ? Math.round(dmg * 1.65) : dmg;
-          this._damageEnemy(e, finalDmg, dx, dy, e.isBoss ? 20 : 175, isCrit, ringCol);
+          this._damageEnemy(e, finalDmg, dx, dy, e.isBoss ? 20 : 175, isCrit, ringCol, 'hammer', true);
         }
       }
       this._damageCratesInRadius(hx, hy, r);
+    }
+  }
+
+  _fireOdinSpears(level) {
+    if (this.activeEnemies.length === 0) return;
+    const targets = this._getNearestActiveEnemies(560 * 560, 1);
+    if (targets.length === 0) return;
+
+    const evo = Boolean(this.evolvedWeapons?.spear);
+    const counts = [0, 1, 1, 2, 2, 3];
+    const pierces = [0, 2, 3, 3, 4, 5];
+    const count = evo ? 4 : counts[level];
+    const pierce = evo ? 7 : pierces[level];
+    const dmg = Math.round((23 + level * 9) * (evo ? 1.4 : 1) * this.stats.mightMult);
+    const speed = 510 + level * 28 + (evo ? 70 : 0);
+
+    audio.playSpearThrow();
+
+    const target = targets[0].enemy;
+    const centerAng = Math.atan2(target.y - this.hero.y, target.x - this.hero.x);
+    const spread = evo ? 0.12 : 0.15;
+
+    for (let i = 0; i < count; i++) {
+      const ang = centerAng + (i - (count - 1) / 2) * spread;
+      const proj = this.projPool.get(this.hero.x, this.hero.y, 'spear_proj');
+      if (!proj) break;
+
+      proj.setTexture('spear_proj');
+      proj.clearTint();
+      if (evo) proj.setTintFill(0xfde047);
+      proj.enableBody(true, this.hero.x, this.hero.y, true, true);
+      proj.baseScale = (this.hdMode ? 0.36 : 1.15) * (1 + (this.stats.areaMult - 1) * 0.35);
+      proj.setScale(proj.baseScale);
+      proj.setRotation(ang);
+      proj.setDepth(DEPTH_LAYERS.VFX - 10);
+      proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
+      proj.kind = 'spear';
+      proj.sourceId = 'spear';
+      proj.evolved = evo;
+      proj.damage = dmg;
+      proj.pierce = pierce;
+      proj.life = 1.25;
+      proj.trailTimer = 0;
+      if (!proj.hitSet) proj.hitSet = new Set();
+      else proj.hitSet.clear();
+      if (!this.activeProjectiles.includes(proj)) this.activeProjectiles.push(proj);
+    }
+  }
+
+  _fireTwilightScythes(level) {
+    if (this.activeEnemies.length === 0) return;
+    const targets = this._getNearestActiveEnemies(480 * 480, 1);
+    const evo = Boolean(this.evolvedWeapons?.scythe);
+    const counts = [0, 1, 1, 2, 2, 3];
+    const count = evo ? 4 : counts[level];
+    const dmg = Math.round((18 + level * 8) * (evo ? 1.42 : 1) * this.stats.mightMult);
+    const speed = 340 + level * 20 + (evo ? 45 : 0);
+
+    audio.playThrow();
+    const baseAng = targets.length > 0
+      ? Math.atan2(targets[0].enemy.y - this.hero.y, targets[0].enemy.x - this.hero.x)
+      : Math.random() * Math.PI * 2;
+
+    for (let i = 0; i < count; i++) {
+      const ang = baseAng + (i * Math.PI * 2) / count;
+      const proj = this.projPool.get(this.hero.x, this.hero.y, 'scythe_proj');
+      if (!proj) break;
+
+      proj.setTexture('scythe_proj');
+      proj.clearTint();
+      if (evo) proj.setTintFill(0xf0abfc);
+      proj.enableBody(true, this.hero.x, this.hero.y, true, true);
+      proj.baseScale = (this.hdMode ? 0.34 : 1.15) * (1 + (this.stats.areaMult - 1) * 0.45) * (evo ? 1.2 : 1);
+      proj.setScale(proj.baseScale);
+      proj.setRotation(0);
+      proj.setDepth(DEPTH_LAYERS.VFX - 9);
+      proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
+      proj.kind = 'scythe';
+      proj.sourceId = 'scythe';
+      proj.evolved = evo;
+      proj.damage = dmg;
+      proj.pierce = 99;
+      proj.life = 1.55;
+      proj.maxLife = 1.55;
+      proj.outSpeed = speed;
+      proj.launchAngle = ang;
+      proj.returning = false;
+      proj.trailTimer = 0;
+      if (!proj.hitSet) proj.hitSet = new Set();
+      else proj.hitSet.clear();
+      if (!this.activeProjectiles.includes(proj)) this.activeProjectiles.push(proj);
+    }
+  }
+
+  _fireShadowFangs(level) {
+    if (this.activeEnemies.length === 0) return;
+    const targets = this._getNearestActiveEnemies(480 * 480, 3);
+    if (targets.length === 0) return;
+
+    const evo = Boolean(this.evolvedWeapons?.fangs);
+    const counts = [0, 1, 1, 2, 2, 3];
+    const bounces = [0, 1, 2, 2, 3, 4];
+    const count = evo ? 4 : counts[level];
+    const maxBounces = evo ? 6 : bounces[level];
+    const dmg = Math.round((15 + level * 7) * (evo ? 1.38 : 1) * this.stats.mightMult);
+    const speed = 420 + level * 22 + (evo ? 50 : 0);
+
+    audio.playThrow();
+
+    for (let i = 0; i < count; i++) {
+      const target = targets[i % targets.length].enemy;
+      const ang = Math.atan2(target.y - this.hero.y, target.x - this.hero.x);
+      const proj = this.projPool.get(this.hero.x, this.hero.y, 'fang_proj');
+      if (!proj) break;
+
+      proj.setTexture('fang_proj');
+      proj.clearTint();
+      if (evo) proj.setTintFill(0xd8b4fe);
+      proj.enableBody(true, this.hero.x, this.hero.y, true, true);
+      proj.baseScale = this.hdMode ? 0.34 : 1.1;
+      proj.setScale(proj.baseScale);
+      proj.setRotation(ang);
+      proj.setDepth(DEPTH_LAYERS.VFX - 10);
+      proj.setVelocity(Math.cos(ang) * speed, Math.sin(ang) * speed);
+      proj.kind = 'fangs';
+      proj.sourceId = 'fangs';
+      proj.evolved = evo;
+      proj.damage = dmg;
+      proj.pierce = maxBounces + 1;
+      proj.bouncesLeft = maxBounces;
+      proj.speedVal = speed;
+      proj.life = 1.4;
+      proj.trailTimer = 0;
+      if (!proj.hitSet) proj.hitSet = new Set();
+      else proj.hitSet.clear();
+      if (!this.activeProjectiles.includes(proj)) this.activeProjectiles.push(proj);
+    }
+  }
+
+  _castAstralGrimoire(level) {
+    const visible = this.activeEnemies.filter((e) => {
+      if (!e.active) return false;
+      return computeSquaredDistance(this.hero.x, this.hero.y, e.x, e.y) < 340 * 340;
+    });
+    if (visible.length === 0) return;
+
+    const evo = Boolean(this.evolvedWeapons?.grimoire);
+    const pillarCounts = [0, 1, 1, 2, 2, 3];
+    const count = evo ? 5 : pillarCounts[level];
+    const radius = (52 + level * 10) * this.stats.areaMult * (evo ? 1.3 : 1);
+    const rSq = radius * radius;
+    const dmg = Math.round((28 + level * 13) * (evo ? 1.4 : 1) * this.stats.mightMult);
+
+    audio.playAuraPulse();
+
+    for (let s = 0; s < count; s++) {
+      const pick = visible[Math.floor(Math.random() * visible.length)];
+      if (!pick || !pick.active) continue;
+      const tx = pick.x;
+      const ty = pick.y;
+      const col = evo ? 0x38bdf8 : 0x60a5fa;
+
+      this.activeAstralPillars.push({ x: tx, y: ty, radius, life: 0, dur: 0.38, color: col });
+      this.activeExplosions.push({ x: tx, y: ty, maxR: radius, life: 0, dur: 0.34, color: col });
+      this._emitSparks(tx, ty, 12, 0xbae6fd, 155);
+
+      for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
+        const e = this.activeEnemies[i];
+        if (!e.active) continue;
+        const dx = e.x - tx;
+        const dy = e.y - ty;
+        if (dx * dx + dy * dy <= rSq) {
+          const isCrit = Math.random() < (this.stats.critChance || 0.16) + (evo ? 0.14 : 0);
+          this._damageEnemy(e, isCrit ? Math.round(dmg * 1.65) : dmg, dx, dy, 105, isCrit, col, 'grimoire', true);
+        }
+      }
+      this._damageCratesInRadius(tx, ty, radius);
+    }
+  }
+
+  _triggerChainFlail(level) {
+    const evo = Boolean(this.evolvedWeapons?.flail);
+    const radius = (76 + level * 11 + (evo ? 20 : 0)) * this.stats.areaMult;
+    const dmg = Math.round((22 + level * 10) * (evo ? 1.45 : 1) * this.stats.mightMult);
+    const sweepTotal = (level >= 5 || evo) ? Math.PI * 2 : Math.PI * (1.25 + level * 0.15);
+    const startAng = this.hero.flipX ? Math.PI - sweepTotal * 0.5 : -sweepTotal * 0.5;
+    audio.playChainSweep();
+    this.activeFlailSwing = {
+      startAng,
+      sweepTotal,
+      life: 0,
+      dur: evo ? 0.48 : 0.44,
+      radius,
+      dmg,
+      evo,
+      hitSet: new Set()
+    };
+  }
+
+  _updateFlailSwing(dt) {
+    const sw = this.activeFlailSwing;
+    if (!sw) return;
+    sw.life += dt;
+    const t = Math.min(1, sw.life / sw.dur);
+    const hx = this.hero.x;
+    const hy = this.hero.y + 4;
+    const headCount = sw.evo ? 2 : 1;
+    const hitSq = 36 * 36;
+
+    for (let h = 0; h < headCount; h++) {
+      const ang = sw.startAng + sw.sweepTotal * t + h * Math.PI;
+      const bx = hx + Math.cos(ang) * sw.radius;
+      const by = hy + Math.sin(ang) * sw.radius;
+
+      // Disegna catena + sfera ferrata sul layer VFX/aura
+      this.auraGfx.lineStyle(3, sw.evo ? 0xfb7185 : 0x94a3b8, 0.85);
+      this.auraGfx.beginPath();
+      this.auraGfx.moveTo(hx, hy);
+      this.auraGfx.lineTo(bx, by);
+      this.auraGfx.strokePath();
+
+      this.auraGfx.fillStyle(sw.evo ? 0xfb7185 : 0xe2e8f0, 0.95);
+      this.auraGfx.fillCircle(bx, by, sw.evo ? 11 : 9);
+      this.auraGfx.lineStyle(2, 0xfb923c, 0.9);
+      this.auraGfx.strokeCircle(bx, by, sw.evo ? 13 : 10.5);
+
+      this._damageCratesInRadius(bx, by, 28);
+
+      for (let i = this.activeEnemies.length - 1; i >= 0; i--) {
+        const e = this.activeEnemies[i];
+        if (!e.active || sw.hitSet.has(e)) continue;
+        const dx = e.x - bx;
+        const dy = e.y - by;
+        if (dx * dx + dy * dy <= hitSq) {
+          sw.hitSet.add(e);
+          const isCrit = Math.random() < (this.stats.critChance || 0.14) + (sw.evo ? 0.15 : 0);
+          this._damageEnemy(
+            e,
+            isCrit ? Math.round(sw.dmg * 1.65) : sw.dmg,
+            e.x - hx,
+            e.y - hy,
+            e.isBoss ? 24 : 185,
+            isCrit,
+            sw.evo ? 0xfb7185 : 0xfb923c,
+            'flail',
+            true
+          );
+        }
+      }
+    }
+
+    if (t >= 1) {
+      this.activeFlailSwing = null;
     }
   }
 
@@ -1737,7 +2423,7 @@ export class GameScene extends Phaser.Scene {
         const dx = e.x - tx;
         const dy = e.y - ty;
         if (dx * dx + dy * dy <= aoeSq) {
-          this._damageEnemy(e, dmg, dx, dy, 105, true, 0x38bdf8);
+          this._damageEnemy(e, dmg, dx, dy, 105, true, 0x38bdf8, 'lightning', true);
         }
       }
 
@@ -1752,7 +2438,7 @@ export class GameScene extends Phaser.Scene {
             life: 0,
             dur: 0.22
           });
-          this._damageEnemy(chain, Math.round(dmg * 0.7), chain.x - tx, chain.y - ty, 90, true, 0xfbbf24);
+          this._damageEnemy(chain, Math.round(dmg * 0.7), chain.x - tx, chain.y - ty, 90, true, 0xfbbf24, 'lightning', true);
         }
       }
     }
@@ -1761,6 +2447,7 @@ export class GameScene extends Phaser.Scene {
   _onProjectileHitEnemy(proj, enemy) {
     if (proj.hitSet && proj.hitSet.has(enemy)) return;
     if (proj.hitSet) proj.hitSet.add(enemy);
+    const sourceId = proj.sourceId || proj.kind || 'axe';
 
     if (proj.kind === 'orb') {
       const r = proj.blastRadius || 54;
@@ -1779,7 +2466,7 @@ export class GameScene extends Phaser.Scene {
         if (dx * dx + dy * dy <= rSq) {
           const isCrit = Math.random() < (this.stats.critChance || 0.18);
           const dmg = isCrit ? Math.round(proj.damage * 1.6) : proj.damage;
-          this._damageEnemy(e, dmg, dx, dy, 95, isCrit, 0x38bdf8);
+          this._damageEnemy(e, dmg, dx, dy, 95, isCrit, 0x38bdf8, sourceId, true);
         }
       }
       if (proj.evolved) {
@@ -1794,15 +2481,39 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const critBonus = (proj.kind === 'dagger' ? 0.12 : 0) + (proj.evolved ? 0.12 : 0);
+    const critBonus = (proj.kind === 'dagger' ? 0.12 : proj.kind === 'spear' ? 0.10 : 0) + (proj.evolved ? 0.12 : 0);
     const isCrit = Math.random() < (this.stats.critChance || 0.18) + critBonus;
     const critMult = proj.kind === 'dagger' ? 1.85 : 1.65;
     const finalDmg = isCrit ? Math.round(proj.damage * critMult) : proj.damage;
-    const sparkColor = proj.kind === 'dagger' ? 0xe879f9 : 0xfbbf24;
-    this._damageEnemy(enemy, finalDmg, proj.body.velocity.x, proj.body.velocity.y, 130, isCrit, sparkColor);
+    const sparkColor = proj.kind === 'dagger' ? 0xe879f9 : proj.kind === 'scythe' ? 0xc084fc : proj.kind === 'fangs' ? 0xd8b4fe : 0xfbbf24;
+    this._damageEnemy(enemy, finalDmg, proj.body.velocity.x, proj.body.velocity.y, 130, isCrit, sparkColor, sourceId, false);
 
     if (proj.kind === 'axe' && proj.evolved) {
       this.activeExplosions.push({ x: enemy.x, y: enemy.y, maxR: 46, life: 0, dur: 0.22, color: 0xfbbf24 });
+    }
+
+    // Rimbalzo per Spine d'Ombra (fangs)
+    if (proj.kind === 'fangs' && proj.bouncesLeft > 0) {
+      let nextEnemy = null;
+      let bestDSq = 230 * 230;
+      for (let i = 0; i < this.activeEnemies.length; i++) {
+        const cand = this.activeEnemies[i];
+        if (!cand.active || (proj.hitSet && proj.hitSet.has(cand))) continue;
+        const dSq = computeSquaredDistance(proj.x, proj.y, cand.x, cand.y);
+        if (dSq < bestDSq) {
+          bestDSq = dSq;
+          nextEnemy = cand;
+        }
+      }
+      if (nextEnemy) {
+        proj.bouncesLeft -= 1;
+        proj.pierce -= 1;
+        const ang = Math.atan2(nextEnemy.y - proj.y, nextEnemy.x - proj.x);
+        const spd = proj.speedVal || 430;
+        proj.setRotation(ang);
+        proj.setVelocity(Math.cos(ang) * spd, Math.sin(ang) * spd);
+        return;
+      }
     }
 
     proj.pierce -= 1;
@@ -1811,25 +2522,50 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  _damageEnemy(enemy, amount, dirX, dirY, knockbackForce, isCrit, sparkColor = 0xfef08a) {
+  _damageEnemy(enemy, amount, dirX, dirY, knockbackForce, isCrit, sparkColor = 0xfef08a, sourceId = null, bypassShield = false) {
     if (!enemy.active) return;
 
-    enemy.hp -= amount;
-    enemy.setTintFill(0xffffff);
+    let finalAmount = amount;
+    let finalKnockback = knockbackForce;
+    let blockedFrontal = false;
+
+    if (enemy.archetype === 'shieldbearer' && !bypassShield && (dirX !== 0 || dirY !== 0)) {
+      const toHeroX = this.hero.x - enemy.x;
+      const toHeroY = this.hero.y - enemy.y;
+      const dirLen = Math.hypot(dirX, dirY) || 1;
+      const heroLen = Math.hypot(toHeroX, toHeroY) || 1;
+      const dot = (dirX * toHeroX + dirY * toHeroY) / (dirLen * heroLen);
+      // Colpo frontale contro lo scudo rivolto all'eroe
+      if (dot < -0.25) {
+        blockedFrontal = true;
+        finalAmount = Math.max(1, Math.round(amount * 0.35));
+        finalKnockback = Math.round(knockbackForce * 0.5);
+        audio.playShieldBlock();
+      }
+    }
+
+    const effectiveDmg = Math.max(0, Math.min(enemy.hp, finalAmount));
+    if (sourceId && effectiveDmg > 0) {
+      if (!this.weaponDamageStats) this.weaponDamageStats = {};
+      this.weaponDamageStats[sourceId] = (this.weaponDamageStats[sourceId] || 0) + effectiveDmg;
+    }
+
+    enemy.hp -= finalAmount;
+    enemy.setTintFill(blockedFrontal ? 0x94a3b8 : 0xffffff);
     enemy.flashTimer = 0.08;
 
-    const kbFactor = enemy.isBoss ? 0.08 : enemy.isMiniBoss ? 0.22 : enemy.archetype === 'tank' ? 0.42 : 1;
+    const kbFactor = enemy.isBoss ? 0.08 : enemy.isMiniBoss ? 0.22 : (enemy.archetype === 'tank' || enemy.archetype === 'shieldbearer') ? 0.42 : 1;
     const len = Math.hypot(dirX, dirY) || 1;
-    if (knockbackForce > 0 && kbFactor > 0) {
-      enemy.setVelocity((dirX / len) * knockbackForce * kbFactor, (dirY / len) * knockbackForce * kbFactor);
+    if (finalKnockback > 0 && kbFactor > 0) {
+      enemy.setVelocity((dirX / len) * finalKnockback * kbFactor, (dirY / len) * finalKnockback * kbFactor);
       enemy.knockbackTimer = 0.11;
     }
 
-    this._emitSparks(enemy.x, enemy.y - 4, isCrit ? 7 : 4, sparkColor, isCrit ? 120 : 80);
-    this._spawnDamageText(enemy.x, enemy.y - 18, amount, isCrit);
-    audio.playHit(isCrit);
+    this._emitSparks(enemy.x, enemy.y - 4, isCrit ? 7 : 4, blockedFrontal ? 0x94a3b8 : sparkColor, isCrit ? 120 : 80);
+    this._spawnDamageText(enemy.x, enemy.y - 18, finalAmount, isCrit && !blockedFrontal);
+    if (!blockedFrontal) audio.playHit(isCrit);
 
-    if (isCrit) {
+    if (isCrit && !blockedFrontal) {
       this.cameras.main.shake(65, 0.0028);
     }
 
@@ -1864,10 +2600,23 @@ export class GameScene extends Phaser.Scene {
     const xpVal = enemy.xpValue || 2;
     const wasBoss = enemy.isBoss;
     const wasMiniBoss = enemy.isMiniBoss;
-    const burstColor = enemy.archetype === 'fast' ? 0x818cf8 : enemy.archetype === 'tank' ? 0xf87171 : enemy.archetype === 'elite' ? 0xfbbf24 : 0x38bdf8;
+    const wasBomber = enemy.archetype === 'bomber' && !enemy.bomberTriggered;
+    const burstColor = enemy.archetype === 'fast' ? 0x818cf8 : enemy.archetype === 'tank' ? 0xf87171 : enemy.archetype === 'elite' ? 0xfbbf24 : enemy.archetype === 'bomber' ? 0xf97316 : 0x38bdf8;
 
     this._emitSparks(ex, ey, wasBoss ? 28 : wasMiniBoss ? 18 : 8, burstColor, wasBoss ? 210 : 120);
     this.kills += 1;
+    if (wasBomber) {
+      enemy.bomberTriggered = true;
+      this.activeTelegraphs.push({
+        x: ex,
+        y: ey,
+        radius: 66,
+        elapsed: 0,
+        duration: 0.75,
+        color: 0xf97316,
+        damage: 24
+      });
+    }
     this._recycleEnemy(enemy);
     this._spawnXpGem(ex, ey, xpVal);
 
@@ -1907,10 +2656,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.gameState = 'ENDED';
+    const combinedXpMult = Number(((this.activeRealm?.xpBonusMult || 1.0) * (this.activeChallenge?.xpMult || 1.0)).toFixed(2));
     this.bridge?.onRunEnded?.({
       victory: true,
       realmId: this.activeRealmId,
-      xpBonusMult: this.activeRealm?.xpBonusMult || 1.0,
+      challengeId: this.activeChallengeId || 'standard',
+      xpBonusMult: combinedXpMult,
       heroId: this.activeHeroId,
       startingWeaponId: this.activeWeaponId,
       elapsedSec: Math.floor(this.elapsedSec),
@@ -1920,7 +2671,10 @@ export class GameScene extends Phaser.Scene {
       miniBossesSlain: this.miniBossesSlain,
       cratesBroken: this.cratesBroken,
       shrinesActivated: this.shrinesActivated,
-      evolutionsForged: this.evolutionsForged
+      evolutionsForged: this.evolutionsForged,
+      skillsUsed: this.skillsUsed || 0,
+      encounteredEnemies: Array.from(this.encounteredEnemies || []),
+      damageBreakdown: this._getDamageBreakdown()
     });
   }
 
@@ -1928,7 +2682,8 @@ export class GameScene extends Phaser.Scene {
     if (this.stats.invulnTimer > 0) return;
 
     const shieldMult = this.activeBuff?.id === 'frost_shield' ? 0.55 : 1;
-    const dmg = Math.max(1, Math.round((enemy.damage || 10) * shieldMult));
+    const ironMult = this.ironSkinTimer > 0 ? 0.25 : 1;
+    const dmg = Math.max(1, Math.round((enemy.damage || 10) * shieldMult * ironMult));
     this.stats.hp = Math.max(0, this.stats.hp - dmg);
     this.stats.invulnTimer = 0.48;
     audio.playPlayerHurt();
@@ -1956,10 +2711,12 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.gameState = 'ENDED';
+    const combinedXpMult = Number(((this.activeRealm?.xpBonusMult || 1.0) * (this.activeChallenge?.xpMult || 1.0)).toFixed(2));
     this.bridge?.onRunEnded?.({
       victory: false,
       realmId: this.activeRealmId,
-      xpBonusMult: this.activeRealm?.xpBonusMult || 1.0,
+      challengeId: this.activeChallengeId || 'standard',
+      xpBonusMult: combinedXpMult,
       heroId: this.activeHeroId,
       startingWeaponId: this.activeWeaponId,
       elapsedSec: Math.floor(this.elapsedSec),
@@ -1969,7 +2726,10 @@ export class GameScene extends Phaser.Scene {
       miniBossesSlain: this.miniBossesSlain,
       cratesBroken: this.cratesBroken,
       shrinesActivated: this.shrinesActivated,
-      evolutionsForged: this.evolutionsForged
+      evolutionsForged: this.evolutionsForged,
+      skillsUsed: this.skillsUsed || 0,
+      encounteredEnemies: Array.from(this.encounteredEnemies || []),
+      damageBreakdown: this._getDamageBreakdown()
     });
   }
 
@@ -1984,7 +2744,7 @@ export class GameScene extends Phaser.Scene {
 
       if (e.flashTimer > 0) {
         e.flashTimer -= dt;
-        if (e.flashTimer <= 0) e.clearTint();
+        if (e.flashTimer <= 0 && !(e.freezeTimer > 0)) e.clearTint();
       }
       if (e.bladeCooldown > 0) e.bladeCooldown -= dt;
 
@@ -1997,8 +2757,15 @@ export class GameScene extends Phaser.Scene {
         e.setPosition(hx + Math.cos(ang) * 380, hy + Math.sin(ang) * 380);
       }
 
+      if (e.freezeTimer > 0) {
+        e.freezeTimer -= dt;
+        if (e.freezeTimer <= 0) e.clearTint();
+      }
+
       if (e.knockbackTimer > 0) {
         e.knockbackTimer -= dt;
+      } else if (e.freezeTimer > 0 && !e.isBoss) {
+        e.setVelocity(0, 0);
       } else if (e.archetype === 'archer') {
         const dist = Math.sqrt(dSq) || 1;
         e.setFlipX(dx < 0);
@@ -2022,6 +2789,69 @@ export class GameScene extends Phaser.Scene {
           if (e.archerCooldown <= 0 && dist <= 280) {
             e.archerWindup = 0.42;
             e.setTintFill(0x7dd3fc);
+          }
+        }
+      } else if (e.archetype === 'shaman') {
+        const dist = Math.sqrt(dSq) || 1;
+        e.setFlipX(dx < 0);
+        if (e.summonWindup > 0) {
+          e.summonWindup -= dt;
+          e.setVelocity(0, 0);
+          if (e.summonWindup <= 0) {
+            e.clearTint();
+            e.summonCooldown = 4.2;
+            const maxToSpawn = Math.min(2, Math.max(0, 6 - (e.summonCount || 0)));
+            for (let s = 0; s < maxToSpawn; s++) {
+              if (this.activeEnemies.length >= GAME_CONFIG.MAX_ENEMIES) break;
+              const ang = Math.atan2(dy, dx) + (s === 0 ? -0.65 : 0.65);
+              const minion = this._spawnEnemy('swarm', e.waveIdx || 0, ang, Math.max(80, dist - 28));
+              if (minion) {
+                minion.setPosition(e.x + Math.cos(ang) * 32, e.y + Math.sin(ang) * 32);
+                e.summonCount = (e.summonCount || 0) + 1;
+              }
+            }
+            this._emitSparks(e.x, e.y - 6, 10, 0xc084fc, 110);
+          }
+        } else {
+          if (dist > 250) {
+            e.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
+          } else if (dist < 170) {
+            e.setVelocity(-(dx / dist) * e.speed * 0.8, -(dy / dist) * e.speed * 0.8);
+          } else {
+            e.setVelocity((-dy / dist) * e.speed * 0.4, (dx / dist) * e.speed * 0.4);
+          }
+          e.summonCooldown -= dt;
+          if (e.summonCooldown <= 0 && dist < 310 && (e.summonCount || 0) < 6 && this.activeEnemies.length < GAME_CONFIG.MAX_ENEMIES) {
+            e.summonWindup = 0.6;
+            e.setTintFill(0xc084fc);
+          }
+        }
+      } else if (e.archetype === 'bomber') {
+        const dist = Math.sqrt(dSq) || 1;
+        e.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
+        e.setFlipX(dx < 0);
+        // Innesca detonazione ritardata se entra a corto raggio (46px)
+        if (dist <= 46 && !e.bomberTriggered) {
+          this._killEnemy(e);
+          continue;
+        }
+      } else if (e.archetype === 'stalker') {
+        const dist = Math.sqrt(dSq) || 1;
+        if (e.dashTime > 0) {
+          e.dashTime -= dt;
+          e.setVelocity(e.dashVx, e.dashVy);
+        } else {
+          e.setVelocity((dx / dist) * e.speed, (dy / dist) * e.speed);
+          e.setFlipX(dx < 0);
+          e.dashCooldown -= dt;
+          if (e.dashCooldown <= 0 && dist >= 85 && dist <= 245) {
+            e.dashTime = 0.28;
+            e.dashCooldown = 2.6;
+            const side = Math.random() < 0.5 ? 1 : -1;
+            const baseAng = Math.atan2(dy, dx) + side * 0.72;
+            e.dashVx = Math.cos(baseAng) * 235;
+            e.dashVy = Math.sin(baseAng) * 235;
+            this._emitSparks(e.x, e.y, 5, 0xe879f9, 85);
           }
         }
       } else if (e.archetype === 'berserker') {
@@ -2062,7 +2892,7 @@ export class GameScene extends Phaser.Scene {
         e.baseScale ||
         (e.isBoss
           ? this.hdMode ? 0.413 : 1.60
-          : e.archetype === 'tank'
+          : (e.archetype === 'tank' || e.archetype === 'shieldbearer')
             ? this.hdMode ? 0.363 : 1.34
             : this.hdMode ? 0.322 : 1.19);
       const wobble = Math.sin(e.walkPhase * 1.4);
@@ -2070,7 +2900,7 @@ export class GameScene extends Phaser.Scene {
 
       e.setDepth(computeEntityDepth(e.y));
       if (e.shadow) {
-        e.shadow.setPosition(e.x, e.y + (e.isBoss ? 37 : e.isMiniBoss ? 28 : e.archetype === 'tank' ? 23 : 15));
+        e.shadow.setPosition(e.x, e.y + (e.isBoss ? 37 : e.isMiniBoss ? 28 : (e.archetype === 'tank' || e.archetype === 'shieldbearer') ? 23 : 15));
       }
     }
 
@@ -2209,7 +3039,9 @@ export class GameScene extends Phaser.Scene {
       computeSquaredDistance(this.hero.x, this.hero.y, t.x, t.y) <= t.radius * t.radius &&
       this.stats.invulnTimer <= 0
     ) {
-      this.stats.hp = Math.max(0, this.stats.hp - (t.damage || 26));
+      const ironMult = this.ironSkinTimer > 0 ? 0.25 : 1;
+      const dmg = Math.max(1, Math.round((t.damage || 26) * ironMult));
+      this.stats.hp = Math.max(0, this.stats.hp - dmg);
       this.stats.invulnTimer = 0.55;
       audio.playPlayerHurt();
       if (this.stats.hp <= 0) {
@@ -2267,6 +3099,22 @@ export class GameScene extends Phaser.Scene {
       p.life -= dt;
       if (p.kind === 'axe') {
         p.angle += 560 * dt;
+      } else if (p.kind === 'scythe') {
+        p.angle += 780 * dt;
+        const halfLife = (p.maxLife || 1.55) * 0.55;
+        if (!p.returning && p.life <= halfLife) {
+          p.returning = true;
+          if (p.hitSet) p.hitSet.clear(); // Permette di colpire nuovamente i nemici al ritorno
+        }
+        if (p.returning) {
+          const ang = Math.atan2(this.hero.y - p.y, this.hero.x - p.x);
+          const retSpd = (p.outSpeed || 360) * 1.15;
+          p.setVelocity(Math.cos(ang) * retSpd, Math.sin(ang) * retSpd);
+          if (computeSquaredDistance(this.hero.x, this.hero.y, p.x, p.y) <= 22 * 22) {
+            this._recycleProjectile(p);
+            continue;
+          }
+        }
       } else if (p.kind === 'orb') {
         const obs = p.baseScale || 1.15;
         const pulse = obs * (1.0 + Math.sin(this.elapsedSec * 14) * 0.12);
@@ -2282,8 +3130,8 @@ export class GameScene extends Phaser.Scene {
 
       p.trailTimer -= dt;
       if (p.trailTimer <= 0) {
-        p.trailTimer = p.kind === 'dagger' ? 0.03 : 0.045;
-        const trailCol = p.kind === 'dagger' ? 0xe879f9 : p.kind === 'orb' ? 0x38bdf8 : 0xfbbf24;
+        p.trailTimer = p.kind === 'dagger' || p.kind === 'spear' ? 0.03 : 0.045;
+        const trailCol = p.kind === 'dagger' ? 0xe879f9 : p.kind === 'orb' ? 0x38bdf8 : p.kind === 'scythe' ? 0xc084fc : p.kind === 'fangs' ? 0xd8b4fe : 0xfbbf24;
         this._emitSparks(p.x, p.y, 1, trailCol, 24);
       }
 
@@ -2313,7 +3161,24 @@ export class GameScene extends Phaser.Scene {
       this.vfxGfx.strokeCircle(p.x, p.y, r);
     }
 
-    // 1b. Esplosioni Globo Arcano
+    // 1b. Esplosioni Globo Arcano & Pilastri Grimorio Astrale
+    for (let i = (this.activeAstralPillars?.length || 0) - 1; i >= 0; i--) {
+      const pl = this.activeAstralPillars[i];
+      pl.life += dt;
+      const t = pl.life / pl.dur;
+      if (t >= 1) {
+        this.activeAstralPillars.splice(i, 1);
+        continue;
+      }
+      const alpha = 1 - t;
+      const col = pl.color || 0x60a5fa;
+      const w = pl.radius * 0.42 * (1 - t * 0.35);
+      this.vfxGfx.fillStyle(col, alpha * 0.32);
+      this.vfxGfx.fillRect(pl.x - w, pl.y - 210, w * 2, 210);
+      this.vfxGfx.fillStyle(0xe0f2fe, alpha * 0.55);
+      this.vfxGfx.fillRect(pl.x - w * 0.35, pl.y - 210, w * 0.7, 210);
+    }
+
     for (let i = this.activeExplosions.length - 1; i >= 0; i--) {
       const ex = this.activeExplosions[i];
       ex.life += dt;
@@ -2556,8 +3421,13 @@ export class GameScene extends Phaser.Scene {
     this._resetJoystick();
     audio.playLevelUp();
 
+    const heroWeapons = (HERO_ROSTER[this.activeHeroId]?.weapons || []).map((w) => w.id);
     const evos = this._getAvailableEvolutions();
-    const available = UPGRADE_CATALOG.filter((u) => this.levels[u.id] < u.maxLevel);
+    const available = UPGRADE_CATALOG.filter((u) => {
+      if (this.levels[u.id] >= u.maxLevel) return false;
+      if (u.type === 'weapon' && heroWeapons.length > 0 && !heroWeapons.includes(u.id)) return false;
+      return true;
+    });
     Phaser.Utils.Array.Shuffle(available);
 
     const choices = [];
@@ -2824,7 +3694,12 @@ export class GameScene extends Phaser.Scene {
         tag: 'EVOLUZIONE LEGGENDARIA'
       };
     } else {
-      const upgradable = UPGRADE_CATALOG.filter((u) => this.levels[u.id] < u.maxLevel);
+      const heroWeapons = (HERO_ROSTER[this.activeHeroId]?.weapons || []).map((w) => w.id);
+      const upgradable = UPGRADE_CATALOG.filter((u) => {
+        if (this.levels[u.id] >= u.maxLevel) return false;
+        if (u.type === 'weapon' && heroWeapons.length > 0 && !heroWeapons.includes(u.id)) return false;
+        return true;
+      });
       if (upgradable.length > 0) {
         const owned = upgradable.filter((u) => this.levels[u.id] > 0);
         const pickPool = owned.length > 0 ? owned : upgradable;
@@ -3145,6 +4020,7 @@ export class GameScene extends Phaser.Scene {
 
   _syncHud() {
     if (!this.bridge?.onHudUpdate) return;
+    const heroSkill = (HERO_ROSTER[this.activeHeroId] || HERO_ROSTER.warrior).activeSkill;
     this.bridge.onHudUpdate({
       xp: this.stats.xp,
       xpNeeded: this.stats.xpNeeded,
@@ -3154,6 +4030,13 @@ export class GameScene extends Phaser.Scene {
       remainingSec: Math.max(0, Math.ceil(GAME_CONFIG.RUN_DURATION_SEC - this.elapsedSec)),
       bossSpawned: this.bossSpawned,
       buff: this.activeBuff ? { ...this.activeBuff } : null,
+      activeSkill: heroSkill ? {
+        ...heroSkill,
+        cooldownRemaining: Number(Math.max(0, this.activeSkillCooldown || 0).toFixed(1)),
+        maxCooldown: heroSkill.cooldownSec,
+        ready: (this.activeSkillCooldown || 0) <= 0,
+        activeTimer: Number(Math.max(0, this.activeSkillBuffTimer || 0, this.ironSkinTimer || 0).toFixed(1))
+      } : null,
       build: this._getBuildSnapshot()
     });
   }
@@ -3757,6 +4640,20 @@ export class GameScene extends Phaser.Scene {
     ensureSimple('enemy_hel_elite', 0xa855f7, 46, 52);
     ensureSimple('boss_hel', 0x7e22ce, 70, 80);
     ensureSimple('shadow_bolt', 0xa855f7, 16, 8);
+
+    // 16. Fallback procedurali per nuovi proiettili e 4 nuovi archetipi nemici
+    ensureSimple('spear_proj', 0xfbbf24, 24, 8);
+    ensureSimple('scythe_proj', 0xc084fc, 22, 22);
+    ensureSimple('fang_proj', 0xd8b4fe, 16, 9);
+    ensureSimple('grimoire_proj', 0x60a5fa, 22, 22);
+    ensureSimple('flail_proj', 0xfb7185, 18, 18);
+
+    for (const prefix of ['enemy', 'enemy_muspel', 'enemy_hel']) {
+      ensureSimple(`${prefix}_shaman`, 0x7e22ce, 32, 37);
+      ensureSimple(`${prefix}_bomber`, 0xf97316, 31, 35);
+      ensureSimple(`${prefix}_shieldbearer`, 0x64748b, 38, 44);
+      ensureSimple(`${prefix}_stalker`, 0xe879f9, 33, 36);
+    }
 
     g.destroy();
   }

@@ -255,12 +255,96 @@
         backdrop-filter: blur(4px);
       }
 
-      /* Dialogo breve in partita (non bloccante) */
+      /* Pulsante Abilità Attiva Eroe (Thumb Zone in basso a destra) */
+      #active-skill-btn {
+        pointer-events: auto;
+        position: absolute;
+        bottom: 20px;
+        right: 14px;
+        width: 58px;
+        height: 58px;
+        padding: 0;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(9, 13, 22, 0.92);
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 26;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+        transition: transform 120ms ease, opacity 150ms ease;
+      }
+
+      #active-skill-btn:active {
+        transform: scale(0.92);
+      }
+
+      #active-skill-btn.is-cooldown {
+        opacity: 0.78;
+      }
+
+      #active-skill-btn.is-ready {
+        box-shadow: 0 0 18px color-mix(in srgb, var(--skill-accent, #f59e0b) 45%, transparent), 0 8px 20px rgba(0, 0, 0, 0.55);
+      }
+
+      #active-skill-btn.is-active {
+        box-shadow: 0 0 22px var(--skill-accent, #f59e0b), 0 0 0 2px var(--skill-accent, #f59e0b) inset;
+      }
+
+      .skill-ring-svg {
+        position: absolute;
+        inset: 0;
+        width: 58px;
+        height: 58px;
+        transform: rotate(-90deg);
+        pointer-events: none;
+      }
+
+      .skill-ring-track {
+        fill: none;
+        stroke: rgba(148, 163, 184, 0.2);
+        stroke-width: 3.5;
+      }
+
+      .skill-ring-progress {
+        fill: none;
+        stroke: var(--skill-accent, #f59e0b);
+        stroke-width: 3.5;
+        stroke-linecap: round;
+        stroke-dasharray: 157.08;
+        stroke-dashoffset: 0;
+        transition: stroke-dashoffset 100ms linear;
+      }
+
+      .skill-btn-icon {
+        width: 20px;
+        height: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--skill-accent, #f59e0b);
+        z-index: 1;
+      }
+
+      .skill-btn-label {
+        font-family: 'Silkscreen', monospace;
+        font-size: 9px;
+        line-height: 1;
+        margin-top: 2px;
+        font-variant-numeric: tabular-nums;
+        color: #f8fafc;
+        z-index: 1;
+      }
+
+      /* Dialogo breve in partita (non bloccante, lascia spazio al pulsante abilità) */
       #inrun-dialogue {
         position: absolute;
         bottom: 16px;
         left: 12px;
-        right: 12px;
+        right: 84px;
         z-index: 25;
         pointer-events: none;
         background: rgba(9, 13, 22, 0.9);
@@ -528,6 +612,69 @@
         color: var(--muted);
       }
 
+      /* Selettore Modificatori Sfida per Regno */
+      #challenge-selector-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+      }
+
+      .challenge-card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 3px;
+        min-height: 54px;
+        padding: 8px 9px;
+        background: rgba(30, 41, 59, 0.5);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        color: var(--text);
+        text-align: left;
+        cursor: pointer;
+        transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+      }
+
+      .challenge-card:active {
+        transform: scale(0.97);
+      }
+
+      .challenge-card.is-selected {
+        background: rgba(30, 41, 59, 0.94);
+        border-color: var(--challenge-accent, var(--gold));
+        box-shadow: 0 0 0 1px var(--challenge-accent, var(--gold)) inset;
+      }
+
+      .challenge-card-head {
+        width: 100%;
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px;
+      }
+
+      .challenge-card-name {
+        font-family: 'Cinzel', serif;
+        font-weight: 700;
+        font-size: 11px;
+        color: var(--text);
+      }
+
+      .challenge-card-exp {
+        font-family: 'Silkscreen', monospace;
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        color: var(--challenge-accent, var(--gold));
+        white-space: nowrap;
+      }
+
+      .challenge-card-desc {
+        font-size: 10px;
+        line-height: 1.25;
+        color: var(--muted);
+      }
+
       #hero-selector-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -709,6 +856,58 @@
         color: var(--muted);
       }
 
+      .hero-active-skill-box {
+        border-top: 1px solid rgba(226, 232, 240, 0.08);
+        padding-top: 8px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .hero-skill-badge {
+        width: 32px;
+        height: 32px;
+        flex-shrink: 0;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: rgba(9, 13, 22, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px;
+      }
+
+      .hero-skill-meta {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .hero-skill-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .hero-skill-cd {
+        font-family: 'Silkscreen', monospace;
+        font-size: 9px;
+        font-variant-numeric: tabular-nums;
+        color: var(--hero-accent, var(--gold));
+      }
+
+      .hero-skill-desc {
+        font-size: 10px;
+        line-height: 1.3;
+        color: var(--muted);
+      }
+
       .records-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -807,6 +1006,65 @@
         color: #fed7aa;
         border-top: 1px solid rgba(226, 232, 240, 0.08);
         padding-top: 6px;
+      }
+
+      /* Riepilogo danni per arma fine partita */
+      .end-damage-card {
+        background: rgba(30, 41, 59, 0.55);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 7px;
+      }
+
+      #end-damage-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        max-height: 132px;
+        overflow-y: auto;
+      }
+
+      .damage-row {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .damage-row-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 11px;
+      }
+
+      .damage-row-name {
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .damage-row-val {
+        font-family: 'Silkscreen', monospace;
+        font-size: 10px;
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .damage-bar-track {
+        width: 100%;
+        height: 4px;
+        border-radius: 4px;
+        background: rgba(9, 13, 22, 0.9);
+        overflow: hidden;
+      }
+
+      .damage-bar-fill {
+        height: 100%;
+        border-radius: 4px;
       }
 
       .btn-primary {
@@ -1341,6 +1599,15 @@
             </div>
             <p id="inrun-dialogue-text"></p>
           </div>
+
+          <button type="button" id="active-skill-btn" class="is-ready" aria-label="Abilità Attiva Eroe">
+            <svg class="skill-ring-svg" viewBox="0 0 58 58" aria-hidden="true">
+              <circle class="skill-ring-track" cx="29" cy="29" r="25" />
+              <circle id="active-skill-ring" class="skill-ring-progress" cx="29" cy="29" r="25" />
+            </svg>
+            <span id="active-skill-icon" class="skill-btn-icon"></span>
+            <span id="active-skill-label" class="skill-btn-label">PRONTO</span>
+          </button>
         </div>
 
         <!-- Allarme Boss -->
@@ -1369,6 +1636,11 @@
           </div>
 
           <div>
+            <p class="section-kicker">Modificatore Sfida</p>
+            <div id="challenge-selector-list"></div>
+          </div>
+
+          <div>
             <p class="section-kicker">Scegli Eroe</p>
             <div id="hero-selector-grid"></div>
           </div>
@@ -1382,6 +1654,7 @@
               <p class="section-kicker" style="margin-bottom:5px">Arma Iniziale</p>
               <div id="weapon-selector-list"></div>
             </div>
+            <div id="hero-active-skill-box" class="hero-active-skill-box"></div>
             <div class="hero-perks-strip">
               <div id="hero-perks-active"></div>
               <div id="hero-next-unlock"></div>
@@ -1499,6 +1772,10 @@
               <div id="end-meta-unlocks" class="hidden"></div>
               <div id="end-codex-unlocks" class="hidden"></div>
               <div id="end-realm-unlock" class="hidden"></div>
+            </div>
+            <div class="end-damage-card hidden" id="end-damage-card">
+              <p class="section-kicker" style="margin:0">Danni per Arma</p>
+              <div id="end-damage-list"></div>
             </div>
             <button type="button" id="next-realm-btn" class="btn-primary hidden">PROSEGUI</button>
             <button type="button" id="play-again-btn" class="btn-primary">GIOCA ANCORA</button>

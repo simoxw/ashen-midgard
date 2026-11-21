@@ -7,6 +7,59 @@ export const REALM_STORAGE_KEY = 'ashen_midgard_realms_v1';
 
 export const REALM_ORDER = ['midgard', 'muspelheim', 'helheim'];
 
+export const CHALLENGE_ORDER = ['standard', 'double_horde', 'dark_frenzy', 'titanomachy'];
+
+export const REALM_CHALLENGES = {
+  standard: {
+    id: 'standard',
+    name: 'Normale',
+    badge: '1.0x EXP',
+    description: 'Esperienza classica del Regno selezionato.',
+    accent: '#94a3b8',
+    hpMult: 1.0,
+    speedMult: 1.0,
+    spawnMult: 1.0,
+    xpMult: 1.0
+  },
+  double_horde: {
+    id: 'double_horde',
+    name: 'Orda Doppia',
+    badge: '+25% EXP',
+    description: 'Sciami molto più densi (+45% nemici, +6% velocità).',
+    accent: '#38bdf8',
+    hpMult: 1.0,
+    speedMult: 1.06,
+    spawnMult: 1.45,
+    xpMult: 1.25
+  },
+  dark_frenzy: {
+    id: 'dark_frenzy',
+    name: 'Frenesia Oscura',
+    badge: '+35% EXP',
+    description: 'Nemici letali e fulminei (+20% HP, +18% velocità, +20% orda).',
+    accent: '#f59e0b',
+    hpMult: 1.2,
+    speedMult: 1.18,
+    spawnMult: 1.2,
+    xpMult: 1.35
+  },
+  titanomachy: {
+    id: 'titanomachy',
+    name: 'Titanomachia',
+    badge: '+60% EXP',
+    description: 'Prova dei Campioni (+55% HP, +12% velocità, +35% orda).',
+    accent: '#f87171',
+    hpMult: 1.55,
+    speedMult: 1.12,
+    spawnMult: 1.35,
+    xpMult: 1.6
+  }
+};
+
+export function getChallengeConfig(challengeId) {
+  return REALM_CHALLENGES[challengeId] || REALM_CHALLENGES.standard;
+}
+
 export const REALM_CATALOG = {
   midgard: {
     id: 'midgard',
@@ -30,6 +83,10 @@ export const REALM_CATALOG = {
       archer: 'enemy_archer',
       berserker: 'enemy_berserker',
       tank: 'enemy_tank',
+      shaman: 'enemy_shaman',
+      bomber: 'enemy_bomber',
+      shieldbearer: 'enemy_shieldbearer',
+      stalker: 'enemy_stalker',
       elite: 'enemy_elite',
       boss: 'boss'
     },
@@ -72,6 +129,10 @@ export const REALM_CATALOG = {
       archer: 'enemy_muspel_archer',
       berserker: 'enemy_muspel_berserker',
       tank: 'enemy_muspel_tank',
+      shaman: 'enemy_muspel_shaman',
+      bomber: 'enemy_muspel_bomber',
+      shieldbearer: 'enemy_muspel_shieldbearer',
+      stalker: 'enemy_muspel_stalker',
       elite: 'enemy_muspel_elite',
       boss: 'boss_surtr'
     },
@@ -114,6 +175,10 @@ export const REALM_CATALOG = {
       archer: 'enemy_hel_archer',
       berserker: 'enemy_hel_berserker',
       tank: 'enemy_hel_tank',
+      shaman: 'enemy_hel_shaman',
+      bomber: 'enemy_hel_bomber',
+      shieldbearer: 'enemy_hel_shieldbearer',
+      stalker: 'enemy_hel_stalker',
       elite: 'enemy_hel_elite',
       boss: 'boss_hel'
     },
@@ -281,6 +346,7 @@ export function getRealmDialogue(realmId, triggerKey, heroId = 'warrior') {
 export function createDefaultRealmProgress() {
   return {
     selectedRealm: 'midgard',
+    selectedChallenge: 'standard',
     unlockedRealms: ['midgard'],
     clearedRealms: {}
   };
@@ -305,8 +371,12 @@ export function loadRealmProgress(recordsHint = null) {
       const selected = REALM_CATALOG[parsed?.selectedRealm] && unlockedSet.has(parsed.selectedRealm)
         ? parsed.selectedRealm
         : 'midgard';
+      const selectedChallenge = REALM_CHALLENGES[parsed?.selectedChallenge]
+        ? parsed.selectedChallenge
+        : 'standard';
       return {
         selectedRealm: selected,
+        selectedChallenge,
         unlockedRealms: Array.from(unlockedSet),
         clearedRealms: cleared
       };

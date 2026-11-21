@@ -251,6 +251,72 @@ export const CODEX_ENTRIES = [
     unlockHint: 'Sconfiggi Surtr o accedi ad Helheim',
     body: 'Sotto le radici più profonde di Yggdrasil scorrono i fiumi silenziosi di Helheim, dove solo chi ha domato gelo e fiamma può sopravvivere.',
     checkUnlock: (stats) => Boolean(stats.clearedRealms?.muspelheim) || Boolean(stats.visitedRealms?.helheim)
+  },
+  {
+    id: 'enemy_shaman',
+    category: 'enemies',
+    title: 'Sciamano Runico',
+    subtitle: 'Evocatore dell’Orda',
+    accent: '#a855f7',
+    defaultUnlocked: false,
+    unlockHint: 'Affronta uno Sciamano Runico o supera 80 uccisioni totali',
+    body: 'Mantiene le distanze dal bersaglio e incanala impulsi violacei per richiamare nuovi servitori nel cuore della battaglia. Eliminalo prima che l’orda si moltiplichi.',
+    checkUnlock: (stats) => Boolean(stats.encounteredEnemies?.shaman) || stats.totalKills >= 80
+  },
+  {
+    id: 'enemy_bomber',
+    category: 'enemies',
+    title: 'Portatore Esplosivo',
+    subtitle: 'Detonazione alla Morte',
+    accent: '#f97316',
+    defaultUnlocked: false,
+    unlockHint: 'Affronta un Portatore Esplosivo o supera 110 uccisioni totali',
+    body: 'Carico di braci e cristalli instabili: quando cade o si avvicina troppo all’eroe, innesca un cerchio esplosivo ritardato. Esci dal raggio prima dello scoppio!',
+    checkUnlock: (stats) => Boolean(stats.encounteredEnemies?.bomber) || stats.totalKills >= 110
+  },
+  {
+    id: 'enemy_shieldbearer',
+    category: 'enemies',
+    title: 'Scudiero Corazzato',
+    subtitle: 'Barriera Frontale Pesante',
+    accent: '#94a3b8',
+    defaultUnlocked: false,
+    unlockHint: 'Affronta uno Scudiero Corazzato o supera 140 uccisioni totali',
+    body: 'Avanza dietro uno scudo a torre rinforzato che devia il 65% dei proiettili frontali. Colpiscilo ai fianchi oppure usa saette, aura, martello e flagello.',
+    checkUnlock: (stats) => Boolean(stats.encounteredEnemies?.shieldbearer) || stats.totalKills >= 140
+  },
+  {
+    id: 'enemy_stalker',
+    category: 'enemies',
+    title: 'Ombra Guizzante',
+    subtitle: 'Scatto Laterale Improvviso',
+    accent: '#e879f9',
+    defaultUnlocked: false,
+    unlockHint: 'Affronta un’Ombra Guizzante o sopravvivi almeno 75 secondi',
+    body: 'Predatore agile che aggira le difese alternando avanzate oblique e scatti laterali fulminei per tagliare la ritirata.',
+    checkUnlock: (stats) => Boolean(stats.encounteredEnemies?.stalker) || stats.bestElapsedSec >= 75
+  },
+  {
+    id: 'wpn_exclusive_arsenal',
+    category: 'weapons',
+    title: 'I 12 Arsenali del Valhalla',
+    subtitle: '3 Armi Esclusive per Eroe',
+    accent: '#f59e0b',
+    defaultUnlocked: false,
+    unlockHint: 'Gioca con almeno 2 eroi diversi o accumula 30 uccisioni',
+    body: 'Ogni campione padroneggia tre armi uniche irripetibili: Astrid con ascia, lame e lancia; Skadi con pugnali, falci e spine; Freya con globo, saetta e grimorio; Bjorn con martello, aura e flagello.',
+    checkUnlock: (stats) => Object.keys(stats.playedHeroes || {}).length >= 2 || stats.totalKills >= 30
+  },
+  {
+    id: 'lore_active_skills',
+    category: 'lore',
+    title: 'Tecniche Attive degli Eroi',
+    subtitle: 'Richiamo d’Emergenza in Battaglia',
+    accent: '#38bdf8',
+    defaultUnlocked: false,
+    unlockHint: 'Attiva un’Abilità Attiva in battaglia (o sopravvivi 30s)',
+    body: 'Quando l’assedio si stringe, ogni eroe può liberare la propria tecnica suprema: Balzo della Valchiria, Passo d’Ombra, Rottura Runica o Pelle di Ferro.',
+    checkUnlock: (stats) => (stats.skillsUsed || 0) >= 1 || stats.bestElapsedSec >= 30
   }
 ];
 
@@ -265,10 +331,12 @@ export function createDefaultCodexState() {
       evolutionsForged: 0,
       bossesSlain: 0,
       bestElapsedSec: 0,
+      skillsUsed: 0,
       playedHeroes: {},
       wonHeroes: {},
       visitedRealms: {},
-      clearedRealms: {}
+      clearedRealms: {},
+      encounteredEnemies: {}
     }
   };
 }
@@ -288,7 +356,8 @@ export function loadCodexState() {
         playedHeroes: { ...(parsed?.stats?.playedHeroes || {}) },
         wonHeroes: { ...(parsed?.stats?.wonHeroes || {}) },
         visitedRealms: { ...(parsed?.stats?.visitedRealms || {}) },
-        clearedRealms: { ...(parsed?.stats?.clearedRealms || {}) }
+        clearedRealms: { ...(parsed?.stats?.clearedRealms || {}) },
+        encounteredEnemies: { ...(parsed?.stats?.encounteredEnemies || {}) }
       }
     };
   } catch {
@@ -330,6 +399,7 @@ export function recordRunCodexProgress(runResult = {}) {
   stats.shrinesActivated += Math.max(0, runResult.shrinesActivated || 0);
   stats.miniBossesSlain += Math.max(0, runResult.miniBossesSlain || 0);
   stats.evolutionsForged += Math.max(0, runResult.evolutionsForged || 0);
+  stats.skillsUsed = (stats.skillsUsed || 0) + Math.max(0, runResult.skillsUsed || 0);
   if (runResult.bossDefeated) {
     stats.bossesSlain += 1;
   }
@@ -345,6 +415,11 @@ export function recordRunCodexProgress(runResult = {}) {
     stats.visitedRealms[runResult.realmId] = true;
     if (runResult.victory) {
       stats.clearedRealms[runResult.realmId] = true;
+    }
+  }
+  if (Array.isArray(runResult.encounteredEnemies)) {
+    for (const enemyType of runResult.encounteredEnemies) {
+      stats.encounteredEnemies[enemyType] = true;
     }
   }
 

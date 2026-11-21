@@ -11,7 +11,7 @@
  *   - Immagini/Media/Font: aggiornamento in background nella stessa CACHE_NAME versionata.
  */
 
-const CACHE_VERSION = 'v4-5';
+const CACHE_VERSION = 'v5-0';
 const CACHE_NAME = `ashen-midgard-${CACHE_VERSION}`;
 
 const IS_AISTUDIO_PREVIEW =
