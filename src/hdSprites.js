@@ -94,6 +94,22 @@ function drawArmorBevel(ctx, x, y, w, h, r, highlight = 'rgba(255,255,255,0.38)'
   ctx.restore();
 }
 
+function drawShoulderPlate(ctx, x, y, w, h, trimColor = '#fbbf24') {
+  ctx.save();
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, '#475569');
+  g.addColorStop(0.55, '#1e293b');
+  g.addColorStop(1, '#0f172a');
+  ctx.fillStyle = g;
+  drawRoundedPath(ctx, x, y, w, h, 10);
+  ctx.fill();
+  ctx.strokeStyle = trimColor;
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+  drawArmorBevel(ctx, x + 2, y + 2, w - 4, h - 4, 8, 'rgba(255,255,255,0.35)');
+  ctx.restore();
+}
+
 export function generateHdTextures(textures) {
   // 1. Terreno Tundra Nordica 512x512 con lastroni di basalto scolpiti, brina e rune
   registerCanvas(textures, 'ground_tile', 512, 512, (ctx, w, h) => {
@@ -3236,6 +3252,13 @@ export function generateHdTextures(textures) {
       bomberBody: '#3b0764', bomberCore: '#d8b4fe', bomberGlow: 'rgba(168, 85, 247, 0.98)',
       shieldPlate: '#1e293b', shieldRim: '#34d399', shieldArmor: '#0f172a',
       stalkerBody: '#064e3b', stalkerTrim: '#a855f7', stalkerEye: 'rgba(52, 211, 153, 0.98)'
+    },
+    {
+      suffix: '_asgard',
+      robeTop: '#78350f', robeBot: '#1e1b4b', robeRim: '#fbbf24', orbCore: '#fef9c3', orbGlow: 'rgba(251, 191, 36, 0.98)',
+      bomberBody: '#b45309', bomberCore: '#fef08a', bomberGlow: 'rgba(251, 191, 36, 0.98)',
+      shieldPlate: '#475569', shieldRim: '#fbbf24', shieldArmor: '#1e293b',
+      stalkerBody: '#312e81', stalkerTrim: '#fbbf24', stalkerEye: 'rgba(251, 191, 36, 0.98)'
     }
   ];
 
@@ -3251,7 +3274,6 @@ export function generateHdTextures(textures) {
       ctx.save();
       ctx.translate(0, bob * 0.9);
 
-      // Veste cerimoniale ampia + mantello runico
       const robe = ctx.createLinearGradient(34, 48, 94, 134);
       robe.addColorStop(0, pal.robeTop);
       robe.addColorStop(0.65, pal.robeBot);
@@ -3271,7 +3293,6 @@ export function generateHdTextures(textures) {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Maschera & cappuccio con corna rituali
       for (const [hx, dir] of [[44, -1], [84, 1]]) {
         ctx.fillStyle = '#e2e8f0';
         ctx.beginPath();
@@ -3297,7 +3318,6 @@ export function generateHdTextures(textures) {
       drawGlowEye(ctx, 56, 35, 2.9, pal.orbCore, pal.orbGlow);
       drawGlowEye(ctx, 72, 35, 2.9, pal.orbCore, pal.orbGlow);
 
-      // Bastone sciamanico con sfera d'evocazione fluttuante
       ctx.save();
       ctx.translate(104, 78);
       ctx.rotate(sway * 1.1);
@@ -3328,7 +3348,6 @@ export function generateHdTextures(textures) {
       ctx.save();
       ctx.translate(0, bob);
 
-      // Corpo curvo con barile/cristallo instabile
       ctx.fillStyle = '#292524';
       drawRoundedPath(ctx, 32, 50, 60, 52, 15);
       ctx.fill();
@@ -3336,7 +3355,6 @@ export function generateHdTextures(textures) {
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Nucleo esplosivo pulsante incandescente frontale
       const bombGrad = ctx.createRadialGradient(62, 76, 4, 62, 76, 28);
       bombGrad.addColorStop(0, pal.bomberCore);
       bombGrad.addColorStop(0.5, pal.bomberBody);
@@ -3354,7 +3372,6 @@ export function generateHdTextures(textures) {
       ctx.lineWidth = 2.4;
       ctx.stroke();
 
-      // Testa ghignante + miccia luminosa
       ctx.fillStyle = '#44403c';
       ctx.beginPath();
       ctx.ellipse(62, 34, 16, 15, sway * 0.5, 0, Math.PI * 2);
@@ -3383,7 +3400,6 @@ export function generateHdTextures(textures) {
       ctx.save();
       ctx.translate(0, bob * 0.8);
 
-      // Corazza pesante dietro lo scudo
       ctx.fillStyle = pal.shieldArmor;
       drawRoundedPath(ctx, 38, 52, 78, 78, 15);
       ctx.fill();
@@ -3391,7 +3407,6 @@ export function generateHdTextures(textures) {
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Elmo chiuso a celata
       ctx.fillStyle = pal.shieldPlate;
       drawRoundedPath(ctx, 52, 16, 48, 40, 12);
       ctx.fill();
@@ -3401,7 +3416,6 @@ export function generateHdTextures(textures) {
       drawGlowEye(ctx, 67, 36, 2.8, '#ffffff', pal.shieldRim);
       drawGlowEye(ctx, 85, 36, 2.8, '#ffffff', pal.shieldRim);
 
-      // Lancia laterale
       ctx.save();
       ctx.translate(128, 78);
       ctx.rotate(sway * 1.1);
@@ -3414,7 +3428,6 @@ export function generateHdTextures(textures) {
       ctx.stroke();
       ctx.restore();
 
-      // Grande Scudo a Torre frontale rinforzato
       const sg = ctx.createLinearGradient(14, 52, 78, 146);
       sg.addColorStop(0, '#94a3b8');
       sg.addColorStop(0.45, pal.shieldPlate);
@@ -3440,7 +3453,6 @@ export function generateHdTextures(textures) {
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
-      // Scia svolazzante d'ombra
       ctx.fillStyle = pal.stalkerBody;
       ctx.beginPath();
       ctx.moveTo(46, 54 + bob);
@@ -3468,7 +3480,6 @@ export function generateHdTextures(textures) {
       ctx.lineWidth = 2.4;
       ctx.stroke();
 
-      // Testa incappucciata bassa e predatoria
       ctx.fillStyle = '#0f172a';
       ctx.beginPath();
       ctx.moveTo(44, 48);
@@ -3481,7 +3492,6 @@ export function generateHdTextures(textures) {
       drawGlowEye(ctx, 59, 38, 3.1, '#ffffff', pal.stalkerEye);
       drawGlowEye(ctx, 75, 38, 3.1, '#ffffff', pal.stalkerEye);
 
-      // Artigli gemelli ricurvi
       for (const [cx, dir] of [[30, -1], [102, 1]]) {
         ctx.strokeStyle = pal.stalkerTrim;
         ctx.lineWidth = 4;
@@ -3493,4 +3503,486 @@ export function generateHdTextures(textures) {
       ctx.restore();
     });
   }
+
+  // ===========================================================================
+  // 16. BIOMA 4° REGNO: ASGARD IN ROVINE (Bifrost, Einherjar, Loki & Odino)
+  // ===========================================================================
+  registerCanvas(textures, 'ground_tile_asgard', 512, 512, (ctx) => {
+    ctx.fillStyle = '#121022';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Lastre di marmo scuro e venature d'oro spezzate
+    for (let i = 0; i < 6; i++) {
+      const gx = (i % 3) * 172 + 12;
+      const gy = Math.floor(i / 3) * 256 + 18;
+      ctx.fillStyle = '#1d1935';
+      drawRoundedPath(ctx, gx, gy, 148, 198, 12);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.16)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Venature astrali del Bifrost
+    const bifrost = ctx.createLinearGradient(0, 120, 512, 390);
+    bifrost.addColorStop(0, 'rgba(56, 189, 248, 0.08)');
+    bifrost.addColorStop(0.5, 'rgba(251, 191, 36, 0.11)');
+    bifrost.addColorStop(1, 'rgba(168, 85, 247, 0.08)');
+    ctx.fillStyle = bifrost;
+    ctx.fillRect(0, 190, 512, 92);
+
+    ctx.strokeStyle = 'rgba(253, 224, 71, 0.22)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(42, 88);
+    ctx.lineTo(138, 142);
+    ctx.lineTo(226, 118);
+    ctx.moveTo(310, 340);
+    ctx.lineTo(425, 390);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_bifrost', 144, 108, (ctx) => {
+    const g = ctx.createLinearGradient(10, 10, 134, 98);
+    g.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+    g.addColorStop(0.5, 'rgba(251, 191, 36, 0.35)');
+    g.addColorStop(1, 'rgba(192, 132, 252, 0.35)');
+    ctx.fillStyle = g;
+    drawRoundedPath(ctx, 12, 16, 120, 76, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(254, 240, 138, 0.65)';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_asgard_gold', 96, 96, (ctx) => {
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(48, 48, 30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(48, 14);
+    ctx.lineTo(48, 82);
+    ctx.moveTo(24, 48);
+    ctx.lineTo(72, 48);
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'decal_shattered_marble', 136, 72, (ctx) => {
+    ctx.fillStyle = 'rgba(71, 85, 105, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(68, 36, 56, 22, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+
+  registerCanvas(textures, 'prop_bifrost_pillar', 112, 148, (ctx) => {
+    ctx.lineJoin = 'round';
+    const colG = ctx.createLinearGradient(26, 20, 86, 136);
+    colG.addColorStop(0, '#64748b');
+    colG.addColorStop(0.5, '#334155');
+    colG.addColorStop(1, '#1e293b');
+    ctx.fillStyle = colG;
+    drawRoundedPath(ctx, 28, 30, 56, 106, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#fbbf24';
+    drawRoundedPath(ctx, 20, 22, 72, 14, 5);
+    ctx.fill();
+    drawGlowEye(ctx, 56, 80, 6, '#fef9c3', 'rgba(251, 191, 36, 0.95)');
+  });
+
+  registerCanvas(textures, 'prop_asgard_brazier', 96, 114, (ctx) => {
+    ctx.fillStyle = '#334155';
+    drawRoundedPath(ctx, 22, 56, 52, 46, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    const flame = ctx.createRadialGradient(48, 38, 4, 48, 42, 30);
+    flame.addColorStop(0, '#ffffff');
+    flame.addColorStop(0.45, '#fbbf24');
+    flame.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    ctx.fillStyle = flame;
+    ctx.beginPath();
+    ctx.arc(48, 40, 30, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  registerAnimated('enemy_asgard_swarm', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 36 - stride * 0.5, 96 - stride * 0.8, 18, 32, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 66 + stride * 0.5, 96 + stride * 0.8, 18, 32, 5);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#334155';
+    drawRoundedPath(ctx, 32, 50, 56, 52, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = '#475569';
+    drawRoundedPath(ctx, 38, 16, 44, 38, 11);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.stroke();
+    drawGlowEye(ctx, 52, 34, 2.8, '#fef9c3', 'rgba(251, 191, 36, 0.95)');
+    drawGlowEye(ctx, 68, 34, 2.8, '#fef9c3', 'rgba(251, 191, 36, 0.95)');
+    ctx.save();
+    ctx.translate(98, 72);
+    ctx.rotate(sway);
+    ctx.translate(-98, -72);
+    ctx.fillStyle = '#e2e8f0';
+    drawRoundedPath(ctx, 94, 34, 10, 44, 3);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_asgard_fast', 144, 112, (ctx, frameIdx) => {
+    const { stride, bob } = getFrameKinematics(frameIdx);
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#1e1b4b';
+    ctx.beginPath();
+    ctx.ellipse(72, 56, 44, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    // Ali spettrali da corvo
+    ctx.fillStyle = '#312e81';
+    ctx.beginPath();
+    ctx.moveTo(64, 48);
+    ctx.quadraticCurveTo(22, 12 - stride * 1.4, 12, 46);
+    ctx.lineTo(54, 60);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(80, 48);
+    ctx.quadraticCurveTo(122, 12 + stride * 1.4, 132, 46);
+    ctx.lineTo(90, 60);
+    ctx.closePath();
+    ctx.fill();
+    drawGlowEye(ctx, 102, 52, 3, '#fef08a', 'rgba(251, 191, 36, 0.98)');
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_asgard_archer', 120, 136, (ctx, frameIdx) => {
+    const { stride, bob } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 38, 96 - stride * 0.5, 16, 32, 5);
+    ctx.fill();
+    drawRoundedPath(ctx, 66, 96 + stride * 0.5, 16, 32, 5);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#78350f';
+    drawRoundedPath(ctx, 34, 50, 52, 52, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    ctx.fillStyle = '#d97706';
+    drawRoundedPath(ctx, 40, 16, 40, 36, 10);
+    ctx.fill();
+    drawGlowEye(ctx, 53, 34, 2.8, '#fffbeb', 'rgba(251, 191, 36, 0.98)');
+    drawGlowEye(ctx, 67, 34, 2.8, '#fffbeb', 'rgba(251, 191, 36, 0.98)');
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(92, 66, 26, -1.1, 1.1);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_asgard_berserker', 144, 160, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#1e1b4b';
+    drawRoundedPath(ctx, 40 - stride * 0.5, 110 - stride * 0.8, 21, 40, 6);
+    ctx.fill();
+    drawRoundedPath(ctx, 82 + stride * 0.5, 110 + stride * 0.8, 21, 40, 6);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#92400e';
+    drawRoundedPath(ctx, 36, 54, 72, 64, 15);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 2.6;
+    ctx.stroke();
+    ctx.fillStyle = '#f59e0b';
+    drawRoundedPath(ctx, 50, 20, 44, 38, 12);
+    ctx.fill();
+    drawGlowEye(ctx, 63, 39, 3.2, '#ffffff', 'rgba(251, 191, 36, 1)');
+    drawGlowEye(ctx, 81, 39, 3.2, '#ffffff', 'rgba(251, 191, 36, 1)');
+    for (const [ax, dir] of [[24, -1], [120, 1]]) {
+      ctx.save();
+      ctx.translate(ax, 84);
+      ctx.rotate(dir * sway * 1.4);
+      ctx.translate(-ax, -84);
+      ctx.fillStyle = '#fde047';
+      drawRoundedPath(ctx, ax - 5, 52, 14, 38, 4);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_asgard_tank', 168, 192, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 42, 138 - stride * 0.65, 30, 44, 8);
+    ctx.fill();
+    drawRoundedPath(ctx, 96, 138 + stride * 0.65, 30, 44, 8);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob * 0.9);
+    ctx.fillStyle = '#334155';
+    drawRoundedPath(ctx, 33, 56, 102, 90, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3.2;
+    ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    drawRoundedPath(ctx, 54, 18, 60, 44, 13);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.stroke();
+    drawGlowEye(ctx, 72, 40, 3.6, '#fef9c3', 'rgba(251, 191, 36, 0.98)');
+    drawGlowEye(ctx, 96, 40, 3.6, '#fef9c3', 'rgba(251, 191, 36, 0.98)');
+    ctx.save();
+    ctx.translate(141, 76);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-141, -76);
+    ctx.fillStyle = '#fbbf24';
+    drawRoundedPath(ctx, 135, 48, 22, 46, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerAnimated('enemy_asgard_elite', 184, 208, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    const aura = ctx.createRadialGradient(92, 104, 18, 92, 104, 86);
+    aura.addColorStop(0, 'rgba(251, 191, 36, 0.35)');
+    aura.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(92, 104, 86, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 48, 148 - stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    drawRoundedPath(ctx, 104, 148 + stride * 0.7, 32, 50, 9);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, bob);
+    ctx.fillStyle = '#475569';
+    drawRoundedPath(ctx, 36, 62, 112, 92, 20);
+    ctx.fill();
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 3.2;
+    ctx.stroke();
+    drawGlowEye(ctx, 92, 104, 11, '#fffbeb', 'rgba(251, 191, 36, 0.98)');
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 58, 22, 68, 46, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.stroke();
+    drawGlowEye(ctx, 78, 45, 4, '#fffbeb', 'rgba(251, 191, 36, 1)');
+    drawGlowEye(ctx, 106, 45, 4, '#fffbeb', 'rgba(251, 191, 36, 1)');
+    ctx.save();
+    ctx.translate(154, 86);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-154, -86);
+    ctx.fillStyle = '#fbbf24';
+    drawRoundedPath(ctx, 148, 22, 14, 126, 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  // BOSS ASGARD FASE 1: Loki, l'Ingannatore (280x320)
+  registerAnimated('boss_loki', 280, 320, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    const aura = ctx.createRadialGradient(140, 156, 26, 140, 156, 132);
+    aura.addColorStop(0, 'rgba(16, 185, 129, 0.34)');
+    aura.addColorStop(0.55, 'rgba(251, 191, 36, 0.2)');
+    aura.addColorStop(1, 'rgba(17, 15, 29, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(140, 156, 132, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 82, 224 - stride * 0.85, 40, 76, 12);
+    ctx.fill();
+    drawRoundedPath(ctx, 158, 224 + stride * 0.85, 40, 76, 12);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob * 1.05);
+
+    // Mantello smeraldo e nero
+    const cloak = ctx.createLinearGradient(58, 92, 222, 240);
+    cloak.addColorStop(0, '#065f46');
+    cloak.addColorStop(0.55, '#064e3b');
+    cloak.addColorStop(1, '#090d16');
+    ctx.fillStyle = cloak;
+    drawRoundedPath(ctx, 64, 96, 152, 138, 26);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Corna dorate curve di Loki
+    for (const [hx, dir] of [[106, -1], [174, 1]]) {
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.moveTo(hx, 48);
+      ctx.quadraticCurveTo(hx + dir * 48, 22, hx + dir * 32, 4);
+      ctx.lineTo(hx + dir * 10, 32);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#090d16';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+    }
+
+    // Volto & elmo d'inganno
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 98, 42, 84, 62, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+    drawGlowEye(ctx, 122, 70, 4.8, '#ecfdf5', 'rgba(52, 211, 153, 0.98)');
+    drawGlowEye(ctx, 158, 70, 4.8, '#ecfdf5', 'rgba(52, 211, 153, 0.98)');
+
+    // Scettro runico smeraldo rotante
+    ctx.save();
+    ctx.translate(226, 156);
+    ctx.rotate(sway * 1.15);
+    ctx.translate(-226, -156);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(226, 48);
+    ctx.lineTo(226, 260);
+    ctx.stroke();
+    drawGlowEye(ctx, 226, 42, 13, '#ecfdf5', 'rgba(16, 185, 129, 0.98)');
+    ctx.restore();
+    ctx.restore();
+  });
+
+  // BOSS ASGARD TRASFORMAZIONE: Odino, il Padre Caduto (280x320)
+  registerAnimated('boss_odin', 280, 320, (ctx, frameIdx) => {
+    const { stride, bob, sway } = getFrameKinematics(frameIdx);
+    const aura = ctx.createRadialGradient(140, 156, 34, 140, 156, 136);
+    aura.addColorStop(0, 'rgba(251, 191, 36, 0.42)');
+    aura.addColorStop(0.55, 'rgba(56, 189, 248, 0.24)');
+    aura.addColorStop(1, 'rgba(17, 15, 29, 0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(140, 156, 136, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    drawRoundedPath(ctx, 78, 222 - stride * 0.75, 46, 78, 12);
+    ctx.fill();
+    drawRoundedPath(ctx, 156, 222 + stride * 0.75, 46, 78, 12);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, bob);
+
+    // Mantello reale blu-notte & corazza d'oro e ossidiana
+    const cloak = ctx.createLinearGradient(52, 88, 228, 244);
+    cloak.addColorStop(0, '#1e1b4b');
+    cloak.addColorStop(0.5, '#334155');
+    cloak.addColorStop(1, '#78350f');
+    ctx.fillStyle = cloak;
+    drawRoundedPath(ctx, 56, 92, 168, 144, 28);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3.6;
+    ctx.stroke();
+
+    // Spallacci alati reali
+    drawShoulderPlate(ctx, 40, 92, 48, 36, '#fbbf24');
+    drawShoulderPlate(ctx, 192, 92, 48, 36, '#fbbf24');
+
+    // Corona & elmo alato + un solo occhio brillante (Huginn/Muninn glow)
+    ctx.fillStyle = '#1e293b';
+    drawRoundedPath(ctx, 94, 34, 92, 68, 18);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.fillStyle = '#e2e8f0';
+    drawRoundedPath(ctx, 114, 74, 52, 34, 12);
+    ctx.fill();
+    drawGlowEye(ctx, 154, 58, 6.2, '#ffffff', 'rgba(251, 191, 36, 0.98)');
+
+    // Gungnir la Lancia Eterna
+    ctx.save();
+    ctx.translate(232, 152);
+    ctx.rotate(sway * 1.1);
+    ctx.translate(-232, -152);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 9;
+    ctx.beginPath();
+    ctx.moveTo(232, 28);
+    ctx.lineTo(232, 278);
+    ctx.stroke();
+    ctx.fillStyle = '#fef9c3';
+    ctx.beginPath();
+    ctx.moveTo(232, 4);
+    ctx.lineTo(214, 42);
+    ctx.lineTo(250, 42);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+
+  registerCanvas(textures, 'loki_bolt', 64, 24, (ctx) => {
+    const lg = ctx.createLinearGradient(6, 12, 60, 12);
+    lg.addColorStop(0, '#065f46');
+    lg.addColorStop(0.55, '#34d399');
+    lg.addColorStop(1, '#fef9c3');
+    ctx.fillStyle = lg;
+    ctx.beginPath();
+    ctx.moveTo(60, 12);
+    ctx.lineTo(18, 3);
+    ctx.lineTo(26, 12);
+    ctx.lineTo(18, 21);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  registerCanvas(textures, 'astral_spear', 72, 26, (ctx) => {
+    const ag = ctx.createLinearGradient(6, 13, 68, 13);
+    ag.addColorStop(0, '#92400e');
+    ag.addColorStop(0.55, '#fbbf24');
+    ag.addColorStop(1, '#ffffff');
+    ctx.fillStyle = ag;
+    ctx.beginPath();
+    ctx.moveTo(68, 13);
+    ctx.lineTo(20, 4);
+    ctx.lineTo(28, 13);
+    ctx.lineTo(20, 22);
+    ctx.closePath();
+    ctx.fill();
+  });
 }

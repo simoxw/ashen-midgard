@@ -317,6 +317,50 @@ export const CODEX_ENTRIES = [
     unlockHint: 'Attiva un’Abilità Attiva in battaglia (o sopravvivi 30s)',
     body: 'Quando l’assedio si stringe, ogni eroe può liberare la propria tecnica suprema: Balzo della Valchiria, Passo d’Ombra, Rottura Runica o Pelle di Ferro.',
     checkUnlock: (stats) => (stats.skillsUsed || 0) >= 1 || stats.bestElapsedSec >= 30
+  },
+  {
+    id: 'lore_asgard',
+    category: 'lore',
+    title: 'Il Ponte Spezzato di Asgard',
+    subtitle: 'Cronache del 4° Regno Finale',
+    accent: '#fbbf24',
+    defaultUnlocked: false,
+    unlockHint: 'Sconfiggi Hel oppure accedi ad Asgard in Rovine',
+    body: 'Sopra le nuvole d’oro e cenere giace ciò che resta della cittadella degli Aesir. Solo chi ha domato i tre regni inferi può varcare il Bifrost spezzato.',
+    checkUnlock: (stats) => Boolean(stats.clearedRealms?.helheim) || Boolean(stats.visitedRealms?.asgard)
+  },
+  {
+    id: 'enemy_asgard_legion',
+    category: 'enemies',
+    title: 'Einherjar Corrotti & Corvi Astrali',
+    subtitle: 'Legioni di Asgard in Rovine',
+    accent: '#fbbf24',
+    defaultUnlocked: false,
+    unlockHint: 'Combatti in Asgard in Rovine',
+    body: 'Antichi guerrieri d’oro e marmo travolti dal crepuscolo, affiancati da custodi del Bifrost e lance celesti.',
+    checkUnlock: (stats) => Boolean(stats.visitedRealms?.asgard)
+  },
+  {
+    id: 'enemy_asgard_boss',
+    category: 'enemies',
+    title: 'Loki & Odino, il Padre Caduto',
+    subtitle: 'Scontro Finale a Doppia Forma',
+    accent: '#fbbf24',
+    defaultUnlocked: false,
+    unlockHint: 'Libera Asgard in Rovine',
+    body: 'Loki apre la sfida con dardi d’illusione e miraggi; quando la sua maschera cade, Odino stesso impugna Gungnir in una tempesta astrale a tre fasi.',
+    checkUnlock: (stats) => Boolean(stats.clearedRealms?.asgard)
+  },
+  {
+    id: 'lore_endless_mode',
+    category: 'lore',
+    title: 'L’Eterno Assedio (Infinita)',
+    subtitle: 'Modalità Sopravvivenza Senza Fine',
+    accent: '#38bdf8',
+    defaultUnlocked: false,
+    unlockHint: 'Gioca almeno 1 partita in Modalità Infinita',
+    body: 'Oltre il quarto minuto non esiste tregua: ogni sessanta secondi l’orda si intensifica di grado e i Signori dei Regni ritornano ciclicamente con nuovi Forzieri.',
+    checkUnlock: (stats) => (stats.endlessRuns || 0) >= 1 || (stats.maxEndlessWave || 0) >= 1
   }
 ];
 
@@ -332,6 +376,8 @@ export function createDefaultCodexState() {
       bossesSlain: 0,
       bestElapsedSec: 0,
       skillsUsed: 0,
+      endlessRuns: 0,
+      maxEndlessWave: 0,
       playedHeroes: {},
       wonHeroes: {},
       visitedRealms: {},
@@ -402,6 +448,10 @@ export function recordRunCodexProgress(runResult = {}) {
   stats.skillsUsed = (stats.skillsUsed || 0) + Math.max(0, runResult.skillsUsed || 0);
   if (runResult.bossDefeated) {
     stats.bossesSlain += 1;
+  }
+  if (runResult.runMode === 'endless') {
+    stats.endlessRuns = (stats.endlessRuns || 0) + 1;
+    stats.maxEndlessWave = Math.max(stats.maxEndlessWave || 0, runResult.endlessWave || 0);
   }
   stats.bestElapsedSec = Math.max(stats.bestElapsedSec, runResult.elapsedSec || 0);
 

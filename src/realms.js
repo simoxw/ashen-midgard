@@ -5,7 +5,7 @@
 
 export const REALM_STORAGE_KEY = 'ashen_midgard_realms_v1';
 
-export const REALM_ORDER = ['midgard', 'muspelheim', 'helheim'];
+export const REALM_ORDER = ['midgard', 'muspelheim', 'helheim', 'asgard'];
 
 export const CHALLENGE_ORDER = ['standard', 'double_horde', 'dark_frenzy', 'titanomachy'];
 
@@ -195,9 +195,57 @@ export const REALM_CATALOG = {
       accent: '#10b981',
       telegraphColor: 0xa855f7
     },
+    nextRealmId: 'asgard',
+    victoryTitle: 'VITTORIA A HELHEIM',
+    victorySub: 'Hel è stata piegata. Il ponte spezzato verso Asgard in Rovine ti attende!'
+  },
+  asgard: {
+    id: 'asgard',
+    order: 4,
+    name: 'Asgard',
+    fullName: 'Asgard in Rovine',
+    subtitle: 'Bifrost Spezzato & Rovine Astrali',
+    accent: '#fbbf24',
+    bgColor: '#110f1d',
+    groundKey: 'ground_tile_asgard',
+    decalKeys: ['decal_bifrost', 'decal_asgard_gold', 'decal_shattered_marble'],
+    propKeys: ['prop_asgard_brazier', 'prop_bifrost_pillar', 'prop_bifrost_pillar', 'prop_asgard_brazier'],
+    weatherMode: 'astral',
+    hpMult: 2.1,
+    speedMult: 1.22,
+    xpBonusMult: 1.9,
+    unlockHint: 'Sconfiggi Hel negli Abissi di Helheim',
+    enemyTexMap: {
+      swarm: 'enemy_asgard_swarm',
+      fast: 'enemy_asgard_fast',
+      archer: 'enemy_asgard_archer',
+      berserker: 'enemy_asgard_berserker',
+      tank: 'enemy_asgard_tank',
+      shaman: 'enemy_asgard_shaman',
+      bomber: 'enemy_asgard_bomber',
+      shieldbearer: 'enemy_asgard_shieldbearer',
+      stalker: 'enemy_asgard_stalker',
+      elite: 'enemy_asgard_elite',
+      boss: 'boss_loki'
+    },
+    rangedProjKey: 'astral_spear',
+    miniBossTitles: ['Einherjar Corrotto', 'Guardiano del Bifrost', 'Valkiria Astrale'],
+    boss: {
+      id: 'loki_odin',
+      name: 'Loki, l’Ingannatore',
+      stage2Name: 'Odino, il Padre Caduto',
+      stage2TexKey: 'boss_odin',
+      warningText: 'ALLARME: LOKI & ODINO SUL TRONO SPEZZATO',
+      maxHp: 12000,
+      damage: 44,
+      speed: 78,
+      attackProfile: 'asgard_dual',
+      accent: '#fbbf24',
+      telegraphColor: 0xfbbf24
+    },
     nextRealmId: null,
-    victoryTitle: 'VITTORIA AD HELHEIM',
-    victorySub: 'Hel è stata piegata. Hai conquistato tutti i Regni di Ashen Midgard!'
+    victoryTitle: 'ASGARD LIBERATA',
+    victorySub: 'Hai spezzato l’inganno di Loki e l’ultima lancia di Odino. Il Valhalla risplende eterno!'
   }
 };
 
@@ -245,6 +293,18 @@ export const REALM_DIALOGUES = {
       role: 'Furia Glaciale · 50% HP',
       accent: '#f87171',
       text: 'Basta giocare! Che il Fimbulvetr ti schiacci in mille frammenti di ghiaccio!'
+    },
+    boss_phase2: {
+      speaker: 'Hrimthurs',
+      role: 'Fase II · Bufera Crescente',
+      accent: '#38bdf8',
+      text: 'Senti il mordere dei ghiacci antichi? Ora la tormenta si abbatte su di te!'
+    },
+    boss_phase3: {
+      speaker: 'Hrimthurs',
+      role: 'Fase III · Cataclisma Polare',
+      accent: '#f87171',
+      text: 'Se devo cadere, trascinerò l’intera piana con me nel gelo eterno!'
     }
   },
   muspelheim: {
@@ -279,6 +339,18 @@ export const REALM_DIALOGUES = {
       role: 'Furia Vulcanica · 50% HP',
       accent: '#ef4444',
       text: 'Osi ancora sfidare il fuoco primordiale? Pioveranno meteore finché non resterà nulla!'
+    },
+    boss_phase2: {
+      speaker: 'Surtr',
+      role: 'Fase II · Eruzione Scarlatta',
+      accent: '#fb923c',
+      text: 'Le fucine si spalancano! Ogni scintilla diventerà una pioggia di fuoco!'
+    },
+    boss_phase3: {
+      speaker: 'Surtr',
+      role: 'Fase III · Fiamma del Ragnarok',
+      accent: '#ef4444',
+      text: 'Nessun’armatura può reggere il cuore di Muspelheim!'
     }
   },
   helheim: {
@@ -313,6 +385,70 @@ export const REALM_DIALOGUES = {
       role: 'Furia dell’Abisso · 50% HP',
       accent: '#a855f7',
       text: 'Ammirevole... allora lascia che le rune dell’oblio spezzino il tuo spirito!'
+    },
+    boss_phase2: {
+      speaker: 'Hel',
+      role: 'Fase II · Velo di Nastrond',
+      accent: '#34d399',
+      text: 'Le anime dei caduti si stringono attorno a te!'
+    },
+    boss_phase3: {
+      speaker: 'Hel',
+      role: 'Fase III · Eclissi Eterna',
+      accent: '#c084fc',
+      text: 'Ora guarda negli occhi la signora dell’ultimo silenzio!'
+    }
+  },
+  asgard: {
+    wave_1: {
+      speaker: 'hero',
+      text: 'Anche il Bifrost è in frantumi. Gli Einherjar corrotti difendono le rovine d’oro di Asgard!'
+    },
+    miniboss_0: {
+      speaker: 'Einherjar Corrotto',
+      role: 'Elite di Asgard',
+      accent: '#fbbf24',
+      text: 'Chi viola la sala del Padre Tutto? Solo l’illusione e la lancia ti attendono!'
+    },
+    wave_3: {
+      speaker: 'hero',
+      text: 'Attenzione agli sciami astrali e alle lance dorate: non restare mai in linea retta!'
+    },
+    wave_5: {
+      speaker: 'Eco del Bifrost',
+      role: 'Presagio Finale',
+      accent: '#fbbf24',
+      text: 'Un sorriso ingannatore risuona tra le colonne. Loki ti osserva dal trono spezzato!'
+    },
+    boss_enter: {
+      speaker: 'Loki, l’Ingannatore',
+      role: 'Fase I · Maestro d’Illusioni',
+      accent: '#10b981',
+      text: 'Sei arrivato fino in cima alle ceneri, mortale? Vediamo se sai distinguere il vero dall’inganno!'
+    },
+    boss_phase2: {
+      speaker: 'Loki, l’Ingannatore',
+      role: 'Fase II · Specchi di Smeraldo',
+      accent: '#34d399',
+      text: 'Colpisci pure la mia ombra: ogni illusione nasconde un altro dardo!'
+    },
+    boss_transform: {
+      speaker: 'Odino, il Padre Caduto',
+      role: 'Trasformazione · Gungnir Risvegliata',
+      accent: '#fbbf24',
+      text: 'Basta inganni, Loki! Affronterai ora la lancia che non manca mai il bersaglio!'
+    },
+    boss_half: {
+      speaker: 'Odino, il Padre Caduto',
+      role: 'Odinforce · 50% HP',
+      accent: '#fbbf24',
+      text: 'Che i fulmini astrali di Yggdrasil giudichino il tuo valore!'
+    },
+    boss_phase3: {
+      speaker: 'Odino, il Padre Caduto',
+      role: 'Fase III · Crepuscolo degli Dei',
+      accent: '#f59e0b',
+      text: 'Se puoi abbattere persino il Signore di Asgard, allora ricostruisci il mondo dalle sue ceneri!'
     }
   }
 };
@@ -347,9 +483,20 @@ export function createDefaultRealmProgress() {
   return {
     selectedRealm: 'midgard',
     selectedChallenge: 'standard',
+    selectedMode: 'campaign',
     unlockedRealms: ['midgard'],
-    clearedRealms: {}
+    clearedRealms: {},
+    endlessRecords: {}
   };
+}
+
+export function isEndlessUnlocked(progress, recordsHint = null) {
+  if (!progress) return (recordsHint?.bossesSlain || 0) >= 1;
+  return (
+    (progress.clearedRealms?.midgard || 0) >= 1 ||
+    (Array.isArray(progress.unlockedRealms) && progress.unlockedRealms.length > 1) ||
+    (recordsHint?.bossesSlain || 0) >= 1
+  );
 }
 
 export function loadRealmProgress(recordsHint = null) {
@@ -363,10 +510,12 @@ export function loadRealmProgress(recordsHint = null) {
         ...(Array.isArray(parsed?.unlockedRealms) ? parsed.unlockedRealms.filter((id) => REALM_CATALOG[id]) : [])
       ]);
       const cleared = { ...(parsed?.clearedRealms || {}) };
-      // Migrazione automatica per chi aveva già sconfitto il primo Boss prima dell'espansione
       if ((recordsHint?.bossesSlain || 0) >= 1) {
         unlockedSet.add('muspelheim');
         if (!cleared.midgard) cleared.midgard = recordsHint.bossesSlain;
+      }
+      if ((cleared.helheim || 0) >= 1) {
+        unlockedSet.add('asgard');
       }
       const selected = REALM_CATALOG[parsed?.selectedRealm] && unlockedSet.has(parsed.selectedRealm)
         ? parsed.selectedRealm
@@ -374,11 +523,15 @@ export function loadRealmProgress(recordsHint = null) {
       const selectedChallenge = REALM_CHALLENGES[parsed?.selectedChallenge]
         ? parsed.selectedChallenge
         : 'standard';
+      const endlessAllowed = unlockedSet.size > 1 || (cleared.midgard || 0) >= 1 || (recordsHint?.bossesSlain || 0) >= 1;
+      const selectedMode = parsed?.selectedMode === 'endless' && endlessAllowed ? 'endless' : 'campaign';
       return {
         selectedRealm: selected,
         selectedChallenge,
+        selectedMode,
         unlockedRealms: Array.from(unlockedSet),
-        clearedRealms: cleared
+        clearedRealms: cleared,
+        endlessRecords: { ...(parsed?.endlessRecords || {}) }
       };
     }
   } catch {
@@ -418,4 +571,21 @@ export function recordRealmVictory(realmId, recordsHint = null) {
   progress.unlockedRealms = Array.from(unlockedSet);
   saveRealmProgress(progress);
   return { progress, newlyUnlockedRealmId };
+}
+
+export function recordEndlessRun(realmId, runResult = {}, recordsHint = null) {
+  const realm = getRealmConfig(realmId);
+  const progress = loadRealmProgress(recordsHint);
+  const prev = progress.endlessRecords?.[realm.id] || { bestTimeSec: 0, maxWave: 0, bestKills: 0 };
+  const elapsedSec = Math.max(0, Math.floor(runResult.elapsedSec || 0));
+  const endlessWave = Math.max(0, Math.floor(runResult.endlessWave || 0));
+  const kills = Math.max(0, Math.floor(runResult.kills || 0));
+
+  progress.endlessRecords[realm.id] = {
+    bestTimeSec: Math.max(prev.bestTimeSec || 0, elapsedSec),
+    maxWave: Math.max(prev.maxWave || 0, endlessWave),
+    bestKills: Math.max(prev.bestKills || 0, kills)
+  };
+  saveRealmProgress(progress);
+  return progress;
 }

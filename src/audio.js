@@ -3,6 +3,8 @@
  * Zero dipendenze esterne o file MP3: leggero, reattivo e 100% offline.
  */
 
+import { loadSettings } from './settings.js';
+
 const MUTE_STORAGE_KEY = 'ashen_midgard_muted';
 
 // Scala pentatonica minore/nordica in Hz per il pitch crescente delle gemme XP
@@ -23,8 +25,13 @@ export class AudioEngine {
   constructor() {
     this.ctx = null;
     this.masterGain = null;
+    this.sfxGain = null;
+    this.bgmGain = null;
+    this.bgmOsc1 = null;
+    this.bgmOsc2 = null;
     this.noiseBuffer = null;
-    this.muted = this._loadMuteState();
+    this.settings = loadSettings();
+    this.muted = this._loadMuteState() || Boolean(this.settings.muted);
     // Rate-limiting per evitare distorsioni con 200+ nemici sullo schermo
     this.lastTimes = {
       hit: 0,
@@ -44,9 +51,39 @@ export class AudioEngine {
 
   _loadMuteState() {
     try {
+      if (typeof localStorage === 'undefined') return false;
       return localStorage.getItem(MUTE_STORAGE_KEY) === '1';
     } catch {
       return false;
+    }
+  }
+
+  _syncGainValues() {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const master = this.muted ? 0 : (this.settings?.masterVolume ?? 0.85) * 0.48;
+    const sfx = (this.settings?.sfxVolume ?? 1.0);
+    const bgm = this.muted ? 0 : (this.settings?.bgmVolume ?? 0.35) * 0.14;
+    if (this.masterGain) this.masterGain.gain.setValueAtTime(master, now);
+    if (this.sfxGain) this.sfxGain.gain.setValueAtTime(sfx, now);
+    if (this.bgmGain) this.bgmGain.gain.setValueAtTime(bgm, now);
+  }
+
+  applySettings(nextSettings = {}) {
+    this.settings = { ...(this.settings || {}), ...nextSettings };
+    if (typeof nextSettings.muted === 'boolean') {
+      this.muted = nextSettings.muted;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(MUTE_STORAGE_KEY, this.muted ? '1' : '0');
+        }
+      } catch {
+        // Ignora errori storage
+      }
+    }
+    this._syncGainValues();
+    if (this.muted || (this.settings.bgmVolume ?? 0) <= 0.01) {
+      this.stopBgm();
     }
   }
 
@@ -56,14 +93,16 @@ export class AudioEngine {
 
   setMuted(muted) {
     this.muted = Boolean(muted);
+    if (this.settings) this.settings.muted = this.muted;
     try {
-      localStorage.setItem(MUTE_STORAGE_KEY, this.muted ? '1' : '0');
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(MUTE_STORAGE_KEY, this.muted ? '1' : '0');
+      }
     } catch {
       // Ignora errori di storage in modalità privata
     }
-    if (this.masterGain && this.ctx) {
-      this.masterGain.gain.setValueAtTime(this.muted ? 0 : 0.42, this.ctx.currentTime);
-    }
+    this._syncGainValues();
+    if (this.muted) this.stopBgm();
   }
 
   toggleMute() {
@@ -75,18 +114,65 @@ export class AudioEngine {
    * Sblocca e inizializza AudioContext al primo gesto utente (necessario su iOS/Chrome Mobile).
    */
   unlock() {
+    if (typeof window === 'undefined') return;
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
       this.ctx = new AudioCtx();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = this.muted ? 0 : 0.42;
+      this.sfxGain = this.ctx.createGain();
+      this.bgmGain = this.ctx.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.bgmGain.connect(this.masterGain);
       this.masterGain.connect(this.ctx.destination);
+      this._syncGainValues();
       this.noiseBuffer = this._createNoiseBuffer();
     }
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
+  }
+
+  startBgm() {
+    if (this.muted || (this.settings?.bgmVolume ?? 0.35) <= 0.01) return;
+    this.unlock();
+    if (!this.ctx || !this.bgmGain || this.bgmOsc1) return;
+    try {
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 180;
+      filter.connect(this.bgmGain);
+
+      const osc1 = this.ctx.createOscillator();
+      osc1.type = 'triangle';
+      osc1.frequency.value = 55; // A1 drone nordico
+      const osc2 = this.ctx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.value = 82.41; // E2 quinta profonda
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      osc1.start();
+      osc2.start();
+      this.bgmOsc1 = osc1;
+      this.bgmOsc2 = osc2;
+      this._syncGainValues();
+    } catch {
+      // Ignora errori su audio context limitati
+    }
+  }
+
+  stopBgm() {
+    try {
+      this.bgmOsc1?.stop?.();
+      this.bgmOsc2?.stop?.();
+      this.bgmOsc1?.disconnect?.();
+      this.bgmOsc2?.disconnect?.();
+    } catch {
+      // Ignore already stopped
+    }
+    this.bgmOsc1 = null;
+    this.bgmOsc2 = null;
   }
 
   _createNoiseBuffer() {

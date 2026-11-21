@@ -26,7 +26,7 @@ jobs:
       - name: Prepare static site
         run: |
           mkdir -p _site/src
-          cp index.html manifest.json story.json sw.js icon.svg apple-touch-icon.png pwa-192x192.png pwa-512x512.png pwa-maskable-512x512.png .nojekyll _site/
+          cp index.html styles.css manifest.json story.json sw.js icon.svg apple-touch-icon.png pwa-192x192.png pwa-512x512.png pwa-maskable-512x512.png .nojekyll _site/
           cp src/*.js _site/src/
           cp -r assets _site/
           sed -i "s/const CACHE_VERSION = '[^']*';/const CACHE_VERSION = 'gh-${{ github.run_number }}';/" _site/sw.js

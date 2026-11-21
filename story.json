@@ -383,6 +383,65 @@
           "particles": "spectral"
         }
       ]
+    },
+    "asgard": {
+      "onGameStart": [
+        {
+          "speaker": "Eco del Bifrost",
+          "text": "Hai varcato l'arcobaleno spezzato. Sotto un cielo squarciato dall'aurora astrale giace Asgard in Rovine, ultimo baluardo degli Dei.",
+          "image": "./assets/story/asgard_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "astral"
+        },
+        {
+          "speaker": "Cronache del Ragnarok",
+          "text": "Resisti quattro minuti alle legioni degli Einherjar corrotti: oltre il trono d'oro spezzato ti attendono l'inganno di Loki e la lancia di Odino.",
+          "image": "./assets/story/asgard_intro.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "astral"
+        }
+      ],
+      "onBossSpawn": [
+        {
+          "speaker": "Loki, l'Ingannatore",
+          "text": "Benvenuto nella sala deserta degli Aesir, mortale. Prima dovrai sopravvivere ai miei miraggi... e poi all'occhio di chi regna sul Crepuscolo!",
+          "image": "./assets/story/boss_asgard.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "spectral"
+        },
+        {
+          "speaker": "Voce delle Rune",
+          "text": "Quando la maschera di Loki cadrà, Odino impugnerà Gungnir in persona. Osserva gli incroci dorati sul terreno!",
+          "image": "./assets/story/boss_asgard.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "astral"
+        }
+      ],
+      "onVictory": [
+        {
+          "speaker": "Canto di Yggdrasil",
+          "text": "Gungnir tace tra le colonne dorate. L'aurora ricuce il cielo sopra Asgard e nuova vita scorre lungo i rami dell'Albero del Mondo.",
+          "image": "./assets/story/asgard_victory.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "astral"
+        },
+        {
+          "speaker": "Cronache del Valhalla",
+          "text": "Hai conquistato Midgard, Muspelheim, Helheim e Asgard in Rovine. Il tuo nome risplende eterno al di là del Fimbulvetr!",
+          "image": "./assets/story/asgard_victory.jpg",
+          "effect": "kenBurnsPan",
+          "particles": "astral"
+        }
+      ],
+      "onGameOver": [
+        {
+          "speaker": "Eco di Gungnir",
+          "text": "Le pietre dorate del Bifrost tremano sotto la tua caduta, ma le rune non ti abbandonano. Torna ad affrontare la sala del Trono!",
+          "image": "./assets/story/asgard_intro.jpg",
+          "effect": "kenBurnsIn",
+          "particles": "astral"
+        }
+      ]
     }
   }
 }

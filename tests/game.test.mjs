@@ -207,8 +207,16 @@ function installPhaserMock() {
       this.time = {
         delayedCall: (_ms, fn) => { if (fn) fn(); }
       };
+      const inputListeners = {};
       this.input = {
-        on: () => {},
+        _listeners: inputListeners,
+        on: (evt, fn) => {
+          if (!inputListeners[evt]) inputListeners[evt] = [];
+          inputListeners[evt].push(fn);
+        },
+        emit: (evt, ...args) => {
+          for (const fn of inputListeners[evt] || []) fn(...args);
+        },
         keyboard: {
           createCursorKeys: () => ({
             up: { isDown: false },
@@ -273,8 +281,19 @@ const {
   getRealmDialogue,
   loadRealmProgress,
   saveRealmProgress,
-  recordRealmVictory
+  recordRealmVictory,
+  isEndlessUnlocked,
+  recordEndlessRun
 } = await import('../src/realms.js');
+const { SpatialHashGrid, swapPopPush, swapPopRemove } = await import('../src/spatialGrid.js');
+const { getWeaponEvolutionStatus } = await import('../src/weapons.js');
+const {
+  SETTINGS_STORAGE_KEY,
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+  resetSettings
+} = await import('../src/settings.js');
 
 test('2.5D Depth Layers: entità sempre sopra terreno e ombre anche con Y negative', () => {
   const testYs = [-100000, -1500, -250, -1, 0, 1, 250, 1500, 100000];
@@ -554,7 +573,8 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
     'enemy_shaman', 'enemy_shaman_f1', 'enemy_bomber', 'enemy_shieldbearer', 'enemy_stalker',
     'gem_blue', 'gem_green', 'gem_gold',
     'ground_tile_muspel', 'enemy_muspel_swarm', 'enemy_muspel_swarm_f1', 'enemy_muspel_shaman', 'boss_surtr', 'boss_surtr_f2', 'fire_bolt',
-    'ground_tile_hel', 'enemy_hel_swarm', 'enemy_hel_swarm_f1', 'enemy_hel_stalker', 'boss_hel', 'boss_hel_f2', 'shadow_bolt'
+    'ground_tile_hel', 'enemy_hel_swarm', 'enemy_hel_swarm_f1', 'enemy_hel_stalker', 'boss_hel', 'boss_hel_f2', 'shadow_bolt',
+    'ground_tile_asgard', 'enemy_asgard_swarm', 'enemy_asgard_swarm_f1', 'enemy_asgard_shaman', 'boss_loki', 'boss_loki_f2', 'boss_odin', 'boss_odin_f2', 'loki_bolt', 'astral_spear'
   ]) {
     assert.equal(registered.has(expectedKey), true, `Sprite HD 4x mancante: ${expectedKey}`);
   }
@@ -568,6 +588,8 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
   assert.deepEqual(registered.get('boss'), { width: 280, height: 320 });
   assert.deepEqual(registered.get('boss_surtr'), { width: 280, height: 320 });
   assert.deepEqual(registered.get('boss_hel'), { width: 280, height: 320 });
+  assert.deepEqual(registered.get('boss_loki'), { width: 280, height: 320 });
+  assert.deepEqual(registered.get('boss_odin'), { width: 280, height: 320 });
 
   const root = process.cwd();
   const story = JSON.parse(fs.readFileSync(path.join(root, 'story.json'), 'utf8'));
@@ -585,6 +607,13 @@ test('StoryManager & HD Sprites: selezione vignette per eroe e generazione Canva
   assert.equal(muspelBossSlides[0].image, './assets/story/boss_surtr.jpg');
   const helVictorySlides = sm.getSlidesFor('onVictory', 'mage', 'helheim');
   assert.equal(helVictorySlides[0].image, './assets/story/helheim_victory.jpg');
+
+  const asgardIntroSlides = sm.getSlidesFor('onGameStart', 'warrior', 'asgard');
+  assert.equal(asgardIntroSlides[0].image, './assets/story/asgard_intro.jpg');
+  const asgardBossSlides = sm.getSlidesFor('onBossSpawn', 'warrior', 'asgard');
+  assert.equal(asgardBossSlides[0].image, './assets/story/boss_asgard.jpg');
+  const asgardVictorySlides = sm.getSlidesFor('onVictory', 'warrior', 'asgard');
+  assert.equal(asgardVictorySlides[0].image, './assets/story/asgard_victory.jpg');
 });
 
 test('Heroes & Meta-Progression: 4 eroi, armi sbloccabili e EXP permanente', () => {
@@ -793,15 +822,32 @@ test('Anti-Incastro Ostacoli, Zero-GC Pool & Prontezza GitHub Pages PWA', async 
   const swSrc = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   const deployYml = fs.readFileSync(path.join(root, '.github/workflows/deploy.yml'), 'utf8');
   assert.equal(fs.existsSync(path.join(root, '.nojekyll')), true, '.nojekyll deve esistere nella root per GitHub Pages');
+  assert.equal(fs.existsSync(path.join(root, 'styles.css')), true, 'styles.css deve esistere nella root');
   assert.ok(deployYml.includes('actions/deploy-pages@v4') && deployYml.includes('actions/configure-pages@v5'), 'deploy.yml deve pubblicare con configure-pages + deploy-pages');
   assert.equal(deployYml.includes('npm install'), false, 'deploy.yml non deve eseguire npm install');
+  assert.ok(deployYml.includes('styles.css'), 'deploy.yml deve copiare styles.css nella cartella dist');
   assert.equal(manifestSrc.start_url, './', 'manifest.json deve usare start_url relativo ./');
   assert.equal(manifestSrc.scope, './', 'manifest.json deve usare scope relativo ./');
   assert.ok(viteSrc.includes('VITE_BASE_PATH') && viteSrc.includes(": '/'"), 'vite.config.ts deve supportare / in AI Studio');
   assert.equal(viteSrc.includes("base: './'"), false, 'vite.config.ts non deve forzare base ./ in dev server');
   assert.ok(htmlSrc.includes('src="./src/main.js"') && htmlSrc.includes("register('./sw.js'"), 'index.html deve usare percorsi relativi ./');
+  assert.ok(htmlSrc.includes('href="./styles.css"'), 'index.html deve collegare ./styles.css esterno');
   assert.ok(swSrc.includes('key !== CACHE_NAME') && !swSrc.includes('FONT_CACHE'), 'sw.js deve eliminare ogni vecchia cache diversa da CACHE_NAME');
   assert.equal(swSrc.includes('__ASHEN_BUILD'), false, 'sw.js deve avere una versione esplicita pronta senza build');
+  for (const asset of [
+    './styles.css',
+    './src/settings.js',
+    './src/spatialGrid.js',
+    './src/weapons.js',
+    './src/proceduralTextures.js',
+    './src/weaponSystem.js',
+    './src/bossController.js',
+    './assets/story/asgard_intro.jpg',
+    './assets/story/boss_asgard.jpg',
+    './assets/story/asgard_victory.jpg'
+  ]) {
+    assert.ok(swSrc.includes(asset), `sw.js deve mettere in precache ${asset}`);
+  }
 
   globalThis.document = prevDoc;
 });
@@ -923,7 +969,7 @@ test('Campagna Multi-Regno (Muspelheim/Surtr & Helheim/Hel), Dialoghi In-Run & S
   globalThis.document = undefined;
 
   // 1. Progressione Regni, migrazione vecchi salvataggi e bonus EXP
-  assert.deepEqual(REALM_ORDER, ['midgard', 'muspelheim', 'helheim']);
+  assert.deepEqual(REALM_ORDER, ['midgard', 'muspelheim', 'helheim', 'asgard']);
   localStorage.removeItem(REALM_STORAGE_KEY);
   const freshRealms = loadRealmProgress(null);
   assert.deepEqual(freshRealms.unlockedRealms, ['midgard']);
@@ -1270,4 +1316,258 @@ test('4 Nuovi Archetipi Nemici, Abilità Attive Eroi, Modificatori Sfida & Codex
   globalThis.document = prevDoc;
 });
 
+test('Refactoring Modulare: SpatialHashGrid, Swap-Pop & Impostazioni Persistenti', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  // 1. SpatialHashGrid query di prossimità O(k) + swap-pop O(1)
+  const grid = new SpatialHashGrid(120);
+  const eNear = { active: true, x: 25, y: 30 };
+  const eEdge = { active: true, x: 110, y: 20 };
+  const eFar = { active: true, x: 900, y: 900 };
+  grid.insert(eNear, eNear.x, eNear.y);
+  grid.insert(eEdge, eEdge.x, eEdge.y);
+  grid.insert(eFar, eFar.x, eFar.y);
+
+  const found = grid.queryRadius(0, 0, 125);
+  assert.equal(found.includes(eNear), true);
+  assert.equal(found.includes(eEdge), true);
+  assert.equal(found.includes(eFar), false, 'Nemici fuori raggio non devono risultare nella query');
+
+  const objPool = [];
+  const o1 = { id: 1 };
+  const o2 = { id: 2 };
+  const o3 = { id: 3 };
+  swapPopPush(objPool, o1, '_poolIdx');
+  swapPopPush(objPool, o2, '_poolIdx');
+  swapPopPush(objPool, o3, '_poolIdx');
+  swapPopRemove(objPool, o1, '_poolIdx');
+  assert.equal(objPool.length, 2);
+  assert.equal(o3._poolIdx, 0, 'swapPopRemove deve aggiornare l indice dell ultimo elemento spostato');
+  assert.equal(o1._poolIdx, -1);
+
+  // 2. Settings persistenti + applicazione a GameScene (numeri danno off + joystick fisso)
+  localStorage.removeItem(SETTINGS_STORAGE_KEY);
+  const def = loadSettings();
+  assert.deepEqual(def, DEFAULT_SETTINGS);
+
+  const saved = saveSettings({
+    masterVolume: 0.4,
+    sfxVolume: 0.6,
+    bgmVolume: 0.2,
+    vfxQuality: 'reduced',
+    screenShake: false,
+    damageNumbers: false,
+    joystickMode: 'fixed',
+    haptics: false
+  });
+  assert.equal(saved.vfxQuality, 'reduced');
+  assert.equal(loadSettings().joystickMode, 'fixed');
+
+  const scene = new GameScene();
+  scene.configureBridge({}, null);
+  scene.preload();
+  scene.create();
+  await scene.startNewRun({ heroId: 'warrior', startingWeaponId: 'axe' });
+
+  scene.applySettings({ damageNumbers: false, joystickMode: 'fixed', screenShake: false, vfxQuality: 'reduced' });
+  scene._spawnDamageText(10, 10, 99, true);
+  assert.equal(scene.dmgTextPool.some((t) => t.inUse), false, 'damageNumbers=false non deve allocare testi danno');
+
+  scene.input.emit('pointerdown', { id: 9, x: 40, y: 40 });
+  assert.equal(scene.joyOrigin.x, 92, 'joystickMode=fixed deve ancorare la base in basso a sinistra');
+  assert.equal(scene.joyOrigin.y, 688);
+
+  const reset = resetSettings();
+  assert.deepEqual(reset, DEFAULT_SETTINGS);
+
+  globalThis.document = prevDoc;
+});
+
+test('Asgard in Rovine (Loki -> Odino), Boss Multi-Fase & Badge Evoluzioni Armi', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  // 1. Sblocco 4° Regno Asgard dopo vittoria ad Helheim
+  localStorage.removeItem(REALM_STORAGE_KEY);
+  const helVictory = recordRealmVictory('helheim', { bossesSlain: 2 });
+  assert.equal(helVictory.newlyUnlockedRealmId, 'asgard');
+  assert.equal(helVictory.progress.unlockedRealms.includes('asgard'), true);
+  assert.equal(getRealmConfig('asgard').boss.id, 'loki_odin');
+
+  // 2. Stato badge evoluzione per arma + passiva + forziere + evoluta
+  assert.equal(getWeaponEvolutionStatus('axe', { axe: 2 }, {}).badgeLabel, '2/5');
+  assert.equal(getWeaponEvolutionStatus('axe', { axe: 5 }, {}).status, 'needs_passive');
+  assert.equal(getWeaponEvolutionStatus('axe', { axe: 5, might: 1 }, {}).status, 'chest_ready');
+  assert.equal(getWeaponEvolutionStatus('axe', { axe: 5, might: 1 }, { axe: true }).badgeLabel, 'EVOLUTA');
+
+  const scene = new GameScene();
+  const dialogues = [];
+  const bossHuds = [];
+  let lastLevelUp = null;
+  let lastHud = null;
+  let lastEnd = null;
+  scene.configureBridge(
+    {
+      onDialogue: (d) => dialogues.push(d),
+      onBossHudUpdate: (b) => bossHuds.push(b),
+      onLevelUp: (c) => { lastLevelUp = c; },
+      onHudUpdate: (h) => { lastHud = h; },
+      onRunEnded: (r) => { lastEnd = r; }
+    },
+    null
+  );
+  scene.preload();
+  scene.create();
+
+  await scene.startNewRun({
+    heroId: 'warrior',
+    startingWeaponId: 'spear',
+    textureKey: 'hero_warrior',
+    realmId: 'asgard'
+  });
+
+  assert.equal(scene.ground.texture, 'ground_tile_asgard');
+  assert.ok(lastHud?.build?.[0]?.evoStatus, 'Il build snapshot HUD deve esporre evoStatus');
+
+  // Verifica evoStatus nelle scelte Level-Up
+  scene.levels.spear = 5;
+  scene.levels.swift = 1;
+  scene._openLevelUpScreen();
+  assert.equal(lastLevelUp[0].evoStatus?.status, 'evolved');
+  scene.resumeGame();
+
+  // 3. Boss Asgard: Loki Fase I -> Fase II (<66%) -> Trasformazione Odino (<=55%) -> Fase III (<33%)
+  scene._spawnBoss();
+  assert.equal(scene.bossSprite.texture, 'boss_loki');
+  assert.equal(bossHuds.at(-1).phaseLabel, 'FASE I');
+
+  scene.timers.bossAttack = 0;
+  scene.update(2000, 33);
+  assert.equal(
+    scene.activeEnemyProjectiles.some((p) => p.texture === 'loki_bolt'),
+    true,
+    'Loki deve scagliare illusioni loki_bolt nella prima fase'
+  );
+
+  // Scendi sotto 66% HP -> Fase II
+  scene._damageEnemy(scene.bossSprite, 4300, 1, 0, 0, false);
+  assert.equal(scene.bossSprite.phase, 2);
+  assert.equal(bossHuds.at(-1).phaseLabel, 'FASE II');
+  assert.equal(dialogues.some((d) => d.triggerKey === 'boss_phase2'), true);
+
+  // Scendi sotto 55% HP -> Trasformazione in Odino, il Padre Caduto
+  scene._damageEnemy(scene.bossSprite, 1400, 1, 0, 0, false);
+  assert.equal(scene.bossTransformed, true);
+  assert.equal(scene.bossSprite.texture, 'boss_odin');
+  assert.equal(bossHuds.at(-1).name, 'Odino, il Padre Caduto');
+  assert.equal(dialogues.some((d) => d.triggerKey === 'boss_transform'), true);
+
+  scene.timers.bossAttack = 0;
+  scene.update(4000, 33);
+  assert.equal(
+    scene.activeEnemyProjectiles.some((p) => p.texture === 'astral_spear'),
+    true,
+    'Odino trasformato deve scagliare astral_spear'
+  );
+
+  // Scendi sotto 33% HP -> Fase III
+  scene._damageEnemy(scene.bossSprite, 2600, 1, 0, 0, false);
+  assert.equal(scene.bossSprite.phase, 3);
+  assert.equal(bossHuds.at(-1).phaseLabel, 'FASE III');
+  assert.equal(dialogues.some((d) => d.triggerKey === 'boss_phase3'), true);
+
+  // Abbatti Odino -> vittoria Asgard & Codex
+  scene._killEnemy(scene.bossSprite);
+  await new Promise((r) => setTimeout(r, 760));
+  assert.equal(lastEnd?.victory, true);
+  assert.equal(lastEnd?.realmId, 'asgard');
+
+  localStorage.removeItem(CODEX_STORAGE_KEY);
+  const asgardCodex = recordRunCodexProgress(lastEnd);
+  const codexSet = new Set(asgardCodex.newlyUnlocked.map((e) => e.id));
+  assert.equal(codexSet.has('enemy_asgard_legion'), true);
+  assert.equal(codexSet.has('enemy_asgard_boss'), true);
+  assert.equal(codexSet.has('lore_asgard'), true);
+
+  globalThis.document = prevDoc;
+});
+
+test('Modalità Infinita: Ondate oltre 240s, Boss Ciclici con Forziere & Record Persistenti', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  localStorage.removeItem(REALM_STORAGE_KEY);
+  const lockedProgress = loadRealmProgress(null);
+  assert.equal(isEndlessUnlocked(lockedProgress, null), false);
+  const unlockedProgress = loadRealmProgress({ bossesSlain: 1 });
+  assert.equal(isEndlessUnlocked(unlockedProgress, { bossesSlain: 1 }), true);
+
+  const scene = new GameScene();
+  let lastHud = null;
+  let lastEnd = null;
+  scene.configureBridge(
+    {
+      onHudUpdate: (h) => { lastHud = h; },
+      onRunEnded: (r) => { lastEnd = r; }
+    },
+    null
+  );
+  scene.preload();
+  scene.create();
+
+  await scene.startNewRun({
+    heroId: 'assassin',
+    startingWeaponId: 'dagger',
+    textureKey: 'hero_assassin',
+    realmId: 'midgard',
+    runMode: 'endless'
+  });
+
+  assert.equal(scene.runMode, 'endless');
+
+  // Avanza oltre i 240s e 300s -> incrementa endlessWave e spawn del primo boss ciclico
+  scene.elapsedSec = 245;
+  scene.update(1000, 16);
+  assert.equal(scene.endlessWave, 1);
+  assert.equal(lastHud?.runMode, 'endless');
+  assert.equal(lastHud?.endlessWave, 1);
+  assert.equal(scene.bossSpawned, true, 'In modalità infinita il primo boss deve comunque apparire a 240s');
+
+  await new Promise((r) => setTimeout(r, 1260));
+  assert.ok(scene.bossSprite?.active, 'Dopo il banner di allarme il Boss deve risultare attivo');
+
+  // Sconfiggi il boss in modalità infinita -> NON termina la run, rilascia forziere e programma prossimo boss
+  scene._killEnemy(scene.bossSprite);
+  assert.equal(scene.gameState, 'PLAYING');
+  assert.equal(scene.bossesDefeatedCount, 1);
+  assert.ok(scene.nextEndlessBossSec >= scene.elapsedSec + 170);
+  assert.equal(
+    scene.pickupItems.some((p) => p.active && p.kind === 'chest'),
+    true,
+    'Sconfiggere un boss in Infinita deve rilasciare un Forziere del Valhalla'
+  );
+
+  // Avanza a 310s -> Wave 2 Infinita
+  scene.elapsedSec = 310;
+  scene.update(2000, 16);
+  assert.equal(scene.endlessWave, 2);
+
+  // Fine partita per Game Over -> salva record Infinita e sblocca Codex lore_endless_mode
+  scene._triggerGameOver();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(lastEnd?.victory, false);
+  assert.equal(lastEnd?.runMode, 'endless');
+  assert.equal(lastEnd?.endlessWave, 2);
+  assert.equal(lastEnd?.bossesDefeatedCount, 1);
+
+  const savedEndless = recordEndlessRun('midgard', lastEnd, { bossesSlain: 1 });
+  assert.equal(savedEndless.endlessRecords.midgard.maxWave, 2);
+  assert.ok(savedEndless.endlessRecords.midgard.bestTimeSec >= 310);
+
+  const endlessCodex = recordRunCodexProgress(lastEnd);
+  assert.equal(endlessCodex.newlyUnlocked.some((e) => e.id === 'lore_endless_mode'), true);
+
+  globalThis.document = prevDoc;
+});
 

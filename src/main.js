@@ -32,8 +32,15 @@ import {
   getRealmConfig,
   loadRealmProgress,
   saveRealmProgress,
-  recordRealmVictory
+  recordRealmVictory,
+  isEndlessUnlocked,
+  recordEndlessRun
 } from './realms.js';
+import {
+  loadSettings,
+  saveSettings,
+  resetSettings
+} from './settings.js';
 
 const RECORDS_STORAGE_KEY = 'ashen_midgard_records_v1';
 
@@ -115,6 +122,11 @@ function saveRecords(runResult) {
 // Elementi DOM principali
 const el = {
   titleScreen: document.getElementById('title-screen'),
+  titleSettingsBtn: document.getElementById('title-settings-btn'),
+  modeCampaignBtn: document.getElementById('mode-campaign-btn'),
+  modeEndlessBtn: document.getElementById('mode-endless-btn'),
+  modeEndlessSub: document.getElementById('mode-endless-sub'),
+  endlessRecordBar: document.getElementById('endless-record-bar'),
   playBtn: document.getElementById('play-btn'),
   titleMuteBtn: document.getElementById('title-mute-btn'),
   realmSelectorList: document.getElementById('realm-selector-list'),
@@ -152,6 +164,7 @@ const el = {
 
   bossHud: document.getElementById('boss-hud'),
   bossName: document.getElementById('boss-name'),
+  bossPhase: document.getElementById('boss-phase'),
   bossHpText: document.getElementById('boss-hp-text'),
   bossHpFill: document.getElementById('boss-hp-fill'),
   bossWarning: document.getElementById('boss-warning'),
@@ -176,10 +189,29 @@ const el = {
 
   pauseModal: document.getElementById('pause-modal'),
   resumeBtn: document.getElementById('resume-btn'),
+  pauseSettingsBtn: document.getElementById('pause-settings-btn'),
   restartBtn: document.getElementById('restart-btn'),
   quitBtn: document.getElementById('quit-btn'),
   pauseMuteBtn: document.getElementById('pause-mute-btn'),
   pauseBuildList: document.getElementById('pause-build-list'),
+
+  settingsModal: document.getElementById('settings-modal'),
+  setMasterVol: document.getElementById('set-master-vol'),
+  setMasterVal: document.getElementById('set-master-val'),
+  setSfxVol: document.getElementById('set-sfx-vol'),
+  setSfxVal: document.getElementById('set-sfx-val'),
+  setBgmVol: document.getElementById('set-bgm-vol'),
+  setBgmVal: document.getElementById('set-bgm-val'),
+  setMutedBtn: document.getElementById('set-muted-btn'),
+  setVfxHigh: document.getElementById('set-vfx-high'),
+  setVfxReduced: document.getElementById('set-vfx-reduced'),
+  setShakeBtn: document.getElementById('set-shake-btn'),
+  setDmgnumBtn: document.getElementById('set-dmgnum-btn'),
+  setJoyDynamic: document.getElementById('set-joy-dynamic'),
+  setJoyFixed: document.getElementById('set-joy-fixed'),
+  setHapticsBtn: document.getElementById('set-haptics-btn'),
+  setResetBtn: document.getElementById('set-reset-btn'),
+  settingsCloseBtn: document.getElementById('settings-close-btn'),
 
   endModal: document.getElementById('end-modal'),
   endTitle: document.getElementById('end-title'),
@@ -295,6 +327,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   let realmState = loadRealmProgress(loadRecords());
   let pendingNextRealmId = null;
 
+  let currentSettings = loadSettings();
+  audio.applySettings(currentSettings);
+
   const buildRunConfig = () => {
     const heroId = HERO_ROSTER[metaState.selectedHero] ? metaState.selectedHero : 'warrior';
     const hero = HERO_ROSTER[heroId];
@@ -310,14 +345,57 @@ window.addEventListener('DOMContentLoaded', async () => {
     const challengeId = REALM_CHALLENGES[realmState.selectedChallenge]
       ? realmState.selectedChallenge
       : 'standard';
+    const endlessAllowed = isEndlessUnlocked(realmState, loadRecords());
+    const runMode = endlessAllowed && realmState.selectedMode === 'endless' ? 'endless' : 'campaign';
     return {
       heroId,
       startingWeaponId,
       textureKey: hero.textureKey,
       effectiveStats: perks,
       realmId,
-      challengeId
+      challengeId,
+      runMode
     };
+  };
+
+  const renderModeSelection = () => {
+    const records = loadRecords();
+    realmState = loadRealmProgress(records);
+    const endlessAllowed = isEndlessUnlocked(realmState, records);
+    const activeMode = endlessAllowed && realmState.selectedMode === 'endless' ? 'endless' : 'campaign';
+
+    if (el.modeCampaignBtn) {
+      const isCamp = activeMode === 'campaign';
+      el.modeCampaignBtn.classList.toggle('is-active', isCamp);
+      el.modeCampaignBtn.setAttribute('aria-pressed', String(isCamp));
+    }
+    if (el.modeEndlessBtn) {
+      const isEnd = activeMode === 'endless';
+      el.modeEndlessBtn.disabled = !endlessAllowed;
+      el.modeEndlessBtn.classList.toggle('is-active', isEnd);
+      el.modeEndlessBtn.setAttribute('aria-pressed', String(isEnd));
+      el.modeEndlessBtn.title = endlessAllowed
+        ? 'Sopravvivi oltre il 4° minuto tra ondate scalari e boss ciclici'
+        : 'Sconfiggi Hrimthurs a Midgard per sbloccare la Modalità Infinita';
+    }
+    if (el.modeEndlessSub) {
+      el.modeEndlessSub.textContent = endlessAllowed ? 'Orda Eterna' : 'Sconfiggi 1° Boss';
+    }
+    if (el.endlessRecordBar) {
+      const rId = realmState.unlockedRealms.includes(realmState.selectedRealm)
+        ? realmState.selectedRealm
+        : 'midgard';
+      const realmName = getRealmConfig(rId).name;
+      const eRec = realmState.endlessRecords?.[rId];
+      if (endlessAllowed && (activeMode === 'endless' || (eRec && eRec.bestTimeSec > 0))) {
+        el.endlessRecordBar.classList.remove('hidden');
+        el.endlessRecordBar.textContent = eRec && eRec.bestTimeSec > 0
+          ? `Record Infinita (${realmName}): ${formatTime(eRec.bestTimeSec)} · Wave ${eRec.maxWave || 0} · ${eRec.bestKills || 0} K`
+          : `Infinita (${realmName}): Nessun record ancora salvato`;
+      } else {
+        el.endlessRecordBar.classList.add('hidden');
+      }
+    }
   };
 
   const renderRealmSelection = () => {
@@ -360,6 +438,7 @@ window.addEventListener('DOMContentLoaded', async () => {
           realmState.selectedRealm = rId;
           saveRealmProgress(realmState);
           renderRealmSelection();
+          renderModeSelection();
         });
       }
       el.realmSelectorList.appendChild(card);
@@ -575,12 +654,65 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  const syncSettingsUi = () => {
+    const s = currentSettings;
+    const mPct = Math.round((s.masterVolume ?? 0.85) * 100);
+    const sPct = Math.round((s.sfxVolume ?? 1.0) * 100);
+    const bPct = Math.round((s.bgmVolume ?? 0.35) * 100);
+    if (el.setMasterVol) el.setMasterVol.value = String(mPct);
+    if (el.setMasterVal) el.setMasterVal.textContent = `${mPct}%`;
+    if (el.setSfxVol) el.setSfxVol.value = String(sPct);
+    if (el.setSfxVal) el.setSfxVal.textContent = `${sPct}%`;
+    if (el.setBgmVol) el.setBgmVol.value = String(bPct);
+    if (el.setBgmVal) el.setBgmVal.textContent = `${bPct}%`;
+
+    if (el.setMutedBtn) {
+      el.setMutedBtn.textContent = s.muted ? 'SÌ' : 'NO';
+      el.setMutedBtn.classList.toggle('is-active', Boolean(s.muted));
+      el.setMutedBtn.setAttribute('aria-pressed', String(Boolean(s.muted)));
+    }
+    if (el.setVfxHigh && el.setVfxReduced) {
+      const high = s.vfxQuality !== 'reduced';
+      el.setVfxHigh.classList.toggle('is-active', high);
+      el.setVfxHigh.setAttribute('aria-pressed', String(high));
+      el.setVfxReduced.classList.toggle('is-active', !high);
+      el.setVfxReduced.setAttribute('aria-pressed', String(!high));
+    }
+    if (el.setShakeBtn) {
+      const on = s.screenShake !== false;
+      el.setShakeBtn.textContent = on ? 'ATTIVO' : 'NO';
+      el.setShakeBtn.classList.toggle('is-active', on);
+      el.setShakeBtn.setAttribute('aria-pressed', String(on));
+    }
+    if (el.setDmgnumBtn) {
+      const on = s.damageNumbers !== false;
+      el.setDmgnumBtn.textContent = on ? 'ATTIVO' : 'NO';
+      el.setDmgnumBtn.classList.toggle('is-active', on);
+      el.setDmgnumBtn.setAttribute('aria-pressed', String(on));
+    }
+    if (el.setJoyDynamic && el.setJoyFixed) {
+      const dyn = s.joystickMode !== 'fixed';
+      el.setJoyDynamic.classList.toggle('is-active', dyn);
+      el.setJoyDynamic.setAttribute('aria-pressed', String(dyn));
+      el.setJoyFixed.classList.toggle('is-active', !dyn);
+      el.setJoyFixed.setAttribute('aria-pressed', String(!dyn));
+    }
+    if (el.setHapticsBtn) {
+      const on = s.haptics !== false;
+      el.setHapticsBtn.textContent = on ? 'ATTIVO' : 'NO';
+      el.setHapticsBtn.classList.toggle('is-active', on);
+      el.setHapticsBtn.setAttribute('aria-pressed', String(on));
+    }
+    updateMuteButtons();
+  };
+
+  renderModeSelection();
   renderRealmSelection();
   renderChallengeSelection();
   renderHeroSelection();
   renderTitleRecords();
   updateCodexButtonLabel();
-  updateMuteButtons();
+  syncSettingsUi();
   setupPwaExperience();
 
   const storyManager = new StoryManager(audio);
@@ -641,6 +773,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   const gameScene = new GameScene();
 
+  // Cache valori HUD per aggiornamento DOM con dirty checking (zero reflow inutili a 60 FPS)
+  let hudCache = {};
+  const resetHudCache = () => {
+    hudCache = {};
+  };
+
   // Bridge eventi tra Phaser GameScene e Overlay HTML/CSS
   const bridge = {
     onSceneReady() {
@@ -656,55 +794,107 @@ window.addEventListener('DOMContentLoaded', async () => {
     },
 
     onHudUpdate(data) {
-      const pct = Math.min(100, Math.max(0, (data.xp / Math.max(1, data.xpNeeded)) * 100));
-      if (el.xpFill) el.xpFill.style.width = `${pct.toFixed(1)}%`;
-      if (el.hudLevel) el.hudLevel.textContent = `LV ${data.level}`;
-      if (el.hudKills) el.hudKills.textContent = String(data.kills);
+      const pct = Math.min(100, Math.max(0, (data.xp / Math.max(1, data.xpNeeded)) * 100)).toFixed(1);
+      if (el.xpFill && hudCache.xpPct !== pct) {
+        hudCache.xpPct = pct;
+        el.xpFill.style.width = `${pct}%`;
+      }
+      if (el.hudLevel && hudCache.level !== data.level) {
+        hudCache.level = data.level;
+        el.hudLevel.textContent = `LV ${data.level}`;
+      }
+      if (el.hudKills && hudCache.kills !== data.kills) {
+        hudCache.kills = data.kills;
+        el.hudKills.textContent = String(data.kills);
+      }
       if (el.hudTimer) {
-        el.hudTimer.textContent = data.bossSpawned
+        const isEndlessPhase = data.runMode === 'endless' && !data.bossSpawned && data.elapsedSec >= 240;
+        const timerText = data.bossSpawned
           ? `BOSS · ${formatTime(data.elapsedSec)}`
-          : formatTime(data.remainingSec);
-        el.hudTimer.classList.toggle('is-boss', data.bossSpawned);
+          : isEndlessPhase
+            ? `INF W${Math.max(1, data.endlessWave || 1)} · ${formatTime(data.elapsedSec)}`
+            : formatTime(data.remainingSec);
+        if (hudCache.timerText !== timerText) {
+          hudCache.timerText = timerText;
+          el.hudTimer.textContent = timerText;
+        }
+        const isBoss = Boolean(data.bossSpawned);
+        if (hudCache.timerBoss !== isBoss) {
+          hudCache.timerBoss = isBoss;
+          el.hudTimer.classList.toggle('is-boss', isBoss);
+        }
+        if (hudCache.timerEndless !== isEndlessPhase) {
+          hudCache.timerEndless = isEndlessPhase;
+          el.hudTimer.classList.toggle('is-endless', isEndlessPhase);
+        }
       }
       if (el.hudBuildStrip && Array.isArray(data.build)) {
-        el.hudBuildStrip.innerHTML = data.build
-          .map(
-            (item) => `
-            <div class="build-chip${item.evolved ? ' is-evolved' : ''}" title="${item.name}" style="border-color:${item.accent}44;color:${item.accent}">
-              <span class="build-chip-icon">${UPGRADE_ICONS[item.id] || ''}</span>
-              <span class="build-chip-lv">${item.evolved ? '★' : item.level}</span>
-            </div>`
-          )
-          .join('');
+        const buildSig = data.build
+          .map((item) => `${item.id}:${item.level}:${item.evolved ? 1 : 0}:${item.evoStatus?.badgeLabel || ''}`)
+          .join('|');
+        if (hudCache.buildSig !== buildSig) {
+          hudCache.buildSig = buildSig;
+          el.hudBuildStrip.innerHTML = data.build
+            .map(
+              (item) => `
+              <div class="build-chip${item.evolved ? ' is-evolved' : ''}" title="${item.evoStatus?.shortHint || item.name}" style="border-color:${item.accent}44;color:${item.accent}">
+                <span class="build-chip-icon">${UPGRADE_ICONS[item.id] || ''}</span>
+                <span class="build-chip-lv">${item.evolved ? '★' : item.level}</span>
+                ${item.evoStatus ? `<span class="build-chip-evo" style="color:${item.evoStatus.accent}">${item.evoStatus.badgeLabel}</span>` : ''}
+              </div>`
+            )
+            .join('');
+        }
       }
       if (el.hudBuffBar) {
-        if (data.buff) {
-          el.hudBuffBar.classList.remove('hidden');
-          el.hudBuffBar.style.borderLeftColor = data.buff.accent || '#38bdf8';
-          el.hudBuffBar.style.color = data.buff.accent || '#e0f2fe';
-          el.hudBuffBar.textContent = `${data.buff.label} · ${Math.max(1, Math.ceil(data.buff.remaining))}s`;
-        } else {
-          el.hudBuffBar.classList.add('hidden');
+        const buffText = data.buff
+          ? `${data.buff.label} · ${Math.max(1, Math.ceil(data.buff.remaining))}s`
+          : '';
+        if (hudCache.buffText !== buffText) {
+          hudCache.buffText = buffText;
+          if (data.buff) {
+            el.hudBuffBar.classList.remove('hidden');
+            el.hudBuffBar.style.borderLeftColor = data.buff.accent || '#38bdf8';
+            el.hudBuffBar.style.color = data.buff.accent || '#e0f2fe';
+            el.hudBuffBar.textContent = buffText;
+          } else {
+            el.hudBuffBar.classList.add('hidden');
+          }
         }
       }
       if (el.activeSkillBtn && data.activeSkill) {
         const sk = data.activeSkill;
-        el.activeSkillBtn.style.setProperty('--skill-accent', sk.accent || '#f59e0b');
-        el.activeSkillBtn.classList.toggle('is-ready', Boolean(sk.ready));
-        el.activeSkillBtn.classList.toggle('is-cooldown', !sk.ready);
-        el.activeSkillBtn.classList.toggle('is-active', (sk.activeTimer || 0) > 0);
-        if (el.activeSkillIcon) {
-          el.activeSkillIcon.innerHTML = SKILL_ICONS[sk.id] || '';
+        if (hudCache.skillKey !== sk.id) {
+          hudCache.skillKey = sk.id;
+          el.activeSkillBtn.style.setProperty('--skill-accent', sk.accent || '#f59e0b');
+          if (el.activeSkillIcon) {
+            el.activeSkillIcon.innerHTML = SKILL_ICONS[sk.id] || '';
+          }
         }
-        if (el.activeSkillLabel) {
-          el.activeSkillLabel.textContent = sk.ready
-            ? (sk.shortName || 'ATTIVA')
-            : `${Math.ceil(sk.cooldownRemaining)}s`;
+        const ready = Boolean(sk.ready);
+        const activeOn = (sk.activeTimer || 0) > 0;
+        if (hudCache.skillReady !== ready) {
+          hudCache.skillReady = ready;
+          el.activeSkillBtn.classList.toggle('is-ready', ready);
+          el.activeSkillBtn.classList.toggle('is-cooldown', !ready);
+        }
+        if (hudCache.skillActive !== activeOn) {
+          hudCache.skillActive = activeOn;
+          el.activeSkillBtn.classList.toggle('is-active', activeOn);
+        }
+        const label = ready ? (sk.shortName || 'ATTIVA') : `${Math.ceil(sk.cooldownRemaining)}s`;
+        if (el.activeSkillLabel && hudCache.skillLabel !== label) {
+          hudCache.skillLabel = label;
+          el.activeSkillLabel.textContent = label;
         }
         if (el.activeSkillRing) {
           const circ = 157.08;
-          const ratio = sk.ready ? 0 : Math.min(1, Math.max(0, sk.cooldownRemaining / Math.max(1, sk.maxCooldown)));
-          el.activeSkillRing.style.strokeDashoffset = (circ * ratio).toFixed(2);
+          const ratio = ready ? 0 : Math.min(1, Math.max(0, sk.cooldownRemaining / Math.max(1, sk.maxCooldown)));
+          const dashOffset = (circ * ratio).toFixed(2);
+          if (hudCache.skillDash !== dashOffset) {
+            hudCache.skillDash = dashOffset;
+            el.activeSkillRing.style.strokeDashoffset = dashOffset;
+          }
         }
       }
     },
@@ -718,15 +908,42 @@ window.addEventListener('DOMContentLoaded', async () => {
     onBossHudUpdate(bossData) {
       if (!el.bossHud) return;
       if (!bossData) {
-        el.bossHud.classList.add('hidden');
+        if (hudCache.bossVisible !== false) {
+          hudCache.bossVisible = false;
+          el.bossHud.classList.add('hidden');
+        }
         return;
       }
-      el.bossHud.classList.remove('hidden');
-      if (el.bossName) el.bossName.textContent = bossData.name;
-      if (el.bossHpText) el.bossHpText.textContent = `${Math.ceil(bossData.hp)} / ${bossData.maxHp}`;
+      if (hudCache.bossVisible !== true) {
+        hudCache.bossVisible = true;
+        el.bossHud.classList.remove('hidden');
+      }
+      if (el.bossName && hudCache.bossName !== bossData.name) {
+        hudCache.bossName = bossData.name;
+        el.bossName.textContent = bossData.name;
+      }
+      if (el.bossPhase) {
+        const phase = bossData.phase || 1;
+        const phaseLabel = bossData.phaseLabel || 'FASE I';
+        if (hudCache.bossPhaseLabel !== phaseLabel || hudCache.bossPhase !== phase) {
+          hudCache.bossPhaseLabel = phaseLabel;
+          hudCache.bossPhase = phase;
+          el.bossPhase.textContent = phaseLabel;
+          el.bossPhase.classList.toggle('is-phase2', phase === 2);
+          el.bossPhase.classList.toggle('is-phase3', phase >= 3);
+        }
+      }
+      const hpText = `${Math.ceil(bossData.hp)} / ${bossData.maxHp}`;
+      if (el.bossHpText && hudCache.bossHpText !== hpText) {
+        hudCache.bossHpText = hpText;
+        el.bossHpText.textContent = hpText;
+      }
       if (el.bossHpFill) {
-        const pct = Math.max(0, Math.min(100, (bossData.hp / bossData.maxHp) * 100));
-        el.bossHpFill.style.width = `${pct.toFixed(1)}%`;
+        const pct = Math.max(0, Math.min(100, (bossData.hp / Math.max(1, bossData.maxHp)) * 100)).toFixed(1);
+        if (hudCache.bossHpPct !== pct) {
+          hudCache.bossHpPct = pct;
+          el.bossHpFill.style.width = `${pct}%`;
+        }
       }
     },
 
@@ -745,6 +962,10 @@ window.addEventListener('DOMContentLoaded', async () => {
             : `LV ${choice.currentLevel} → LV ${choice.nextLevel}`;
 
         const iconKey = choice.weaponId || choice.id;
+        const evoHtml = choice.evoStatus
+          ? `<span class="upgrade-evo-badge" style="color:${choice.evoStatus.accent}">${choice.evoStatus.shortHint}</span>`
+          : '';
+
         card.innerHTML = `
           <div class="upgrade-icon" style="color:${choice.accent};border-color:${choice.accent}55">
             ${UPGRADE_ICONS[iconKey] || ''}
@@ -755,6 +976,7 @@ window.addEventListener('DOMContentLoaded', async () => {
               <span class="upgrade-lv">${levelTag}</span>
             </div>
             <p class="upgrade-desc">${choice.description}</p>
+            ${evoHtml}
           </div>
         `;
         card.addEventListener('click', () => {
@@ -828,9 +1050,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         realmOutcome = recordRealmVictory(realmCfg.id, records);
         realmState = realmOutcome.progress;
       }
+      if (result.runMode === 'endless') {
+        realmState = recordEndlessRun(realmCfg.id, result, records);
+      }
 
       const codexUpdate = recordRunCodexProgress(result);
       renderRealmSelection();
+      renderModeSelection();
       renderChallengeSelection();
       renderTitleRecords();
       renderHeroSelection();
@@ -840,16 +1066,25 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (el.bossHud) el.bossHud.classList.add('hidden');
       if (el.hudBuffBar) el.hudBuffBar.classList.add('hidden');
 
+      const isEndless = result.runMode === 'endless';
       if (el.endTitle) {
         el.endTitle.textContent = result.victory
           ? realmCfg.victoryTitle
-          : `CADUTO A ${realmCfg.name.toUpperCase()}`;
+          : isEndless
+            ? `ASSEDIATO A ${realmCfg.name.toUpperCase()}`
+            : `CADUTO A ${realmCfg.name.toUpperCase()}`;
         el.endTitle.classList.toggle('is-victory', result.victory);
       }
       if (el.endSubtitle) {
-        el.endSubtitle.textContent = result.victory
-          ? realmCfg.victorySub
-          : 'L’orda ti ha sopraffatto, ma il Valhalla attende la tua rivincita.';
+        if (result.victory) {
+          el.endSubtitle.textContent = realmCfg.victorySub;
+        } else if (isEndless) {
+          const eRec = realmState.endlessRecords?.[realmCfg.id];
+          const bestTxt = eRec ? ` · Record: ${formatTime(eRec.bestTimeSec)}` : '';
+          el.endSubtitle.textContent = `Modalità Infinita · Ondata ${result.endlessWave || 0} · Boss abbattuti: ${result.bossesDefeatedCount || 0}${bestTxt}`;
+        } else {
+          el.endSubtitle.textContent = 'L’orda ti ha sopraffatto, ma il Valhalla attende la tua rivincita.';
+        }
       }
       if (el.endRealmUnlock) {
         if (result.victory && realmOutcome.newlyUnlockedRealmId) {
@@ -997,6 +1232,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     audio.unlock();
     audio.playUiClick();
     clearDialogueQueue();
+    resetHudCache();
     el.titleScreen?.classList.add('hidden');
     el.endModal?.classList.add('hidden');
     el.endModal?.classList.remove('flex');
@@ -1006,11 +1242,106 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.chestModal?.classList.remove('flex');
     el.codexModal?.classList.add('hidden');
     el.codexModal?.classList.remove('flex');
+    el.settingsModal?.classList.add('hidden');
+    el.settingsModal?.classList.remove('flex');
     el.hudBuffBar?.classList.add('hidden');
+    el.bossHud?.classList.add('hidden');
     el.gameHud?.classList.remove('hidden');
 
     await gameScene.startNewRun(buildRunConfig());
   };
+
+  el.modeCampaignBtn?.addEventListener('click', () => {
+    audio.unlock();
+    audio.playUiClick();
+    realmState.selectedMode = 'campaign';
+    saveRealmProgress(realmState);
+    renderModeSelection();
+  });
+
+  el.modeEndlessBtn?.addEventListener('click', () => {
+    if (!isEndlessUnlocked(realmState, loadRecords())) return;
+    audio.unlock();
+    audio.playUiClick();
+    realmState.selectedMode = 'endless';
+    saveRealmProgress(realmState);
+    renderModeSelection();
+  });
+
+  const openSettingsModal = () => {
+    audio.unlock();
+    audio.playUiClick();
+    currentSettings = loadSettings();
+    syncSettingsUi();
+    el.settingsModal?.classList.remove('hidden');
+    el.settingsModal?.classList.add('flex');
+  };
+
+  const closeSettingsModal = () => {
+    audio.playUiClick();
+    el.settingsModal?.classList.add('hidden');
+    el.settingsModal?.classList.remove('flex');
+  };
+
+  const updateSettings = (patch) => {
+    currentSettings = gameScene.applySettings({ ...currentSettings, ...patch });
+    audio.applySettings(currentSettings);
+    syncSettingsUi();
+  };
+
+  el.titleSettingsBtn?.addEventListener('click', openSettingsModal);
+  el.pauseSettingsBtn?.addEventListener('click', openSettingsModal);
+  el.settingsCloseBtn?.addEventListener('click', closeSettingsModal);
+
+  el.setMasterVol?.addEventListener('input', (ev) => {
+    updateSettings({ masterVolume: Number(ev.target.value) / 100 });
+  });
+  el.setSfxVol?.addEventListener('input', (ev) => {
+    updateSettings({ sfxVolume: Number(ev.target.value) / 100 });
+  });
+  el.setBgmVol?.addEventListener('input', (ev) => {
+    updateSettings({ bgmVolume: Number(ev.target.value) / 100 });
+  });
+  el.setMutedBtn?.addEventListener('click', () => {
+    audio.unlock();
+    updateSettings({ muted: !currentSettings.muted });
+    if (!currentSettings.muted) audio.playUiClick();
+  });
+  el.setVfxHigh?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ vfxQuality: 'high' });
+  });
+  el.setVfxReduced?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ vfxQuality: 'reduced' });
+  });
+  el.setShakeBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ screenShake: currentSettings.screenShake === false });
+  });
+  el.setDmgnumBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ damageNumbers: currentSettings.damageNumbers === false });
+  });
+  el.setJoyDynamic?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ joystickMode: 'dynamic' });
+  });
+  el.setJoyFixed?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ joystickMode: 'fixed' });
+  });
+  el.setHapticsBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    updateSettings({ haptics: currentSettings.haptics === false });
+  });
+  el.setResetBtn?.addEventListener('click', () => {
+    currentSettings = resetSettings();
+    currentSettings = gameScene.applySettings(currentSettings);
+    audio.applySettings(currentSettings);
+    syncSettingsUi();
+    audio.playUiClick();
+  });
 
   el.playBtn?.addEventListener('click', startGameFlow);
   el.playAgainBtn?.addEventListener('click', startGameFlow);
@@ -1022,6 +1353,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     realmState.selectedRealm = pendingNextRealmId;
     saveRealmProgress(realmState);
     renderRealmSelection();
+    renderModeSelection();
     await startGameFlow();
   });
 
@@ -1048,15 +1380,19 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   el.titleMuteBtn?.addEventListener('click', () => {
     audio.unlock();
-    audio.toggleMute();
-    updateMuteButtons();
+    const muted = audio.toggleMute();
+    currentSettings = saveSettings({ ...currentSettings, muted });
+    gameScene.applySettings(currentSettings);
+    syncSettingsUi();
     audio.playUiClick();
   });
 
   el.pauseMuteBtn?.addEventListener('click', () => {
     audio.unlock();
-    audio.toggleMute();
-    updateMuteButtons();
+    const muted = audio.toggleMute();
+    currentSettings = saveSettings({ ...currentSettings, muted });
+    gameScene.applySettings(currentSettings);
+    syncSettingsUi();
     audio.playUiClick();
   });
 
@@ -1085,8 +1421,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   const returnToTitle = () => {
     audio.playUiClick();
     clearDialogueQueue();
+    resetHudCache();
     el.pauseModal?.classList.add('hidden');
     el.pauseModal?.classList.remove('flex');
+    el.settingsModal?.classList.add('hidden');
+    el.settingsModal?.classList.remove('flex');
     el.endModal?.classList.add('hidden');
     el.endModal?.classList.remove('flex');
     el.chestModal?.classList.add('hidden');
@@ -1097,7 +1436,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.titleScreen?.classList.remove('hidden');
     gameScene.gameState = 'IDLE';
     gameScene.physics.pause();
+    audio.stopBgm();
     renderRealmSelection();
+    renderModeSelection();
     renderChallengeSelection();
     renderHeroSelection();
     renderTitleRecords();
@@ -1107,8 +1448,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   el.quitBtn?.addEventListener('click', returnToTitle);
   el.endTitleBtn?.addEventListener('click', returnToTitle);
 
-  // Tasto ESC o P per mettere in pausa e Spazio/E per Abilità Attiva su desktop
+  // Tasto ESC o P per mettere in pausa/chiudere Impostazioni e Spazio/E per Abilità Attiva su desktop
   window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && el.settingsModal?.classList.contains('flex')) {
+      closeSettingsModal();
+      return;
+    }
     if (ev.key === 'Escape' || ev.key === 'p' || ev.key === 'P') {
       if (gameScene.gameState === 'PLAYING') {
         gameScene.pauseGame(false);

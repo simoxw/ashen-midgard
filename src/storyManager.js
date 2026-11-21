@@ -287,6 +287,7 @@ export class StoryManager {
 
       const isFrost = this.particleMode === 'frost';
       const isSpectral = this.particleMode === 'spectral';
+      const isAstral = this.particleMode === 'astral';
       for (const p of this.particles) {
         p.x += p.vx;
         p.y += isFrost ? Math.abs(p.vy) : -Math.abs(p.vy);
@@ -307,7 +308,9 @@ export class StoryManager {
           ? `rgba(186, 230, 253, ${p.alpha.toFixed(2)})`
           : isSpectral
             ? `rgba(52, 211, 153, ${p.alpha.toFixed(2)})`
-            : `rgba(251, 146, 60, ${p.alpha.toFixed(2)})`;
+            : isAstral
+              ? `rgba(251, 191, 36, ${p.alpha.toFixed(2)})`
+              : `rgba(251, 146, 60, ${p.alpha.toFixed(2)})`;
         this.ctx.fill();
       }
       this.particleRaf = requestAnimationFrame(tick);

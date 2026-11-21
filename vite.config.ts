@@ -1,5 +1,3 @@
-import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
 import {defineConfig, loadEnv} from 'vite';
@@ -35,8 +33,6 @@ export default defineConfig(({mode}) => {
   return {
     base,
     plugins: [
-      react(),
-      tailwindcss(),
       // Assicura che /sw.js non venga mai servito da cache HTTP in dev/preview
       {
         name: 'sw-nocache-headers',
@@ -79,6 +75,7 @@ export default defineConfig(({mode}) => {
           const distAssetUrls = collectDistAssetUrls(distDir);
 
           const staticFiles = [
+            'styles.css',
             'manifest.json',
             'sw.js',
             'story.json',
@@ -98,6 +95,7 @@ export default defineConfig(({mode}) => {
                   new Set([
                     './',
                     './index.html',
+                    './styles.css',
                     './manifest.json',
                     './story.json',
                     './icon.svg',
