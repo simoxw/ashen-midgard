@@ -358,6 +358,8 @@ export class WeaponSystem {
       proj.pierce = pierce;
       proj.life = 1.65;
       proj.trailTimer = 0;
+      proj.ribbonTimer = 0;
+      if (proj.trail) proj.trail.length = 0;
       if (!proj.hitSet) proj.hitSet = new Set();
       else proj.hitSet.clear();
 
@@ -406,6 +408,8 @@ export class WeaponSystem {
       proj.pierce = pierce;
       proj.life = 1.15;
       proj.trailTimer = 0;
+      proj.ribbonTimer = 0;
+      if (proj.trail) proj.trail.length = 0;
       if (!proj.hitSet) proj.hitSet = new Set();
       else proj.hitSet.clear();
 
@@ -451,6 +455,8 @@ export class WeaponSystem {
       proj.pierce = 1;
       proj.life = 1.9;
       proj.trailTimer = 0;
+      proj.ribbonTimer = 0;
+      if (proj.trail) proj.trail.length = 0;
       if (!proj.hitSet) proj.hitSet = new Set();
       else proj.hitSet.clear();
 
@@ -476,6 +482,7 @@ export class WeaponSystem {
       const rSq = r * r;
       const ringCol = evo ? 0xfbbf24 : 0xfb923c;
       s.activeExplosions.push({ x: hx, y: hy, maxR: r, life: -w * 0.08, dur: 0.32, color: ringCol });
+      if (w === 0) s._spawnGroundMark?.('fissure', hx, hy, Math.min(75, baseRadius * 0.65), ringCol);
       s._emitSparks(hx, hy, 8, ringCol, 150);
 
       for (let i = s.activeEnemies.length - 1; i >= 0; i--) {
@@ -534,6 +541,8 @@ export class WeaponSystem {
       proj.pierce = pierce;
       proj.life = 1.25;
       proj.trailTimer = 0;
+      proj.ribbonTimer = 0;
+      if (proj.trail) proj.trail.length = 0;
       if (!proj.hitSet) proj.hitSet = new Set();
       else proj.hitSet.clear();
       swapPopPush(s.activeProjectiles, proj, '_poolIdx');
@@ -580,6 +589,8 @@ export class WeaponSystem {
       proj.launchAngle = ang;
       proj.returning = false;
       proj.trailTimer = 0;
+      proj.ribbonTimer = 0;
+      if (proj.trail) proj.trail.length = 0;
       if (!proj.hitSet) proj.hitSet = new Set();
       else proj.hitSet.clear();
       swapPopPush(s.activeProjectiles, proj, '_poolIdx');
@@ -626,6 +637,8 @@ export class WeaponSystem {
       proj.speedVal = speed;
       proj.life = 1.4;
       proj.trailTimer = 0;
+      proj.ribbonTimer = 0;
+      if (proj.trail) proj.trail.length = 0;
       if (!proj.hitSet) proj.hitSet = new Set();
       else proj.hitSet.clear();
       swapPopPush(s.activeProjectiles, proj, '_poolIdx');
@@ -661,6 +674,7 @@ export class WeaponSystem {
 
       s.activeAstralPillars.push({ x: tx, y: ty, radius, life: 0, dur: 0.38, color: col });
       s.activeExplosions.push({ x: tx, y: ty, maxR: radius, life: 0, dur: 0.34, color: col });
+      s._spawnGroundMark?.('rune', tx, ty, radius * 0.72, col);
       s._emitSparks(tx, ty, 12, 0xbae6fd, 155);
 
       for (let i = s.activeEnemies.length - 1; i >= 0; i--) {
@@ -789,6 +803,7 @@ export class WeaponSystem {
         { x: tx, y: ty }
       ];
       s.activeLightnings.push({ x: tx, y: ty, radius: aoeRadius, points, life: 0, dur: 0.26 });
+      s._spawnGroundMark?.('rune', tx, ty, aoeRadius * 0.65, 0x38bdf8);
       s._emitSparks(tx, ty, 10, 0x7dd3fc, 150);
 
       for (let i = s.activeEnemies.length - 1; i >= 0; i--) {
@@ -830,6 +845,7 @@ export class WeaponSystem {
       const ex = proj.x;
       const ey = proj.y;
       s.activeExplosions.push({ x: ex, y: ey, maxR: r, life: 0, dur: 0.28, color: 0x38bdf8 });
+      s._spawnGroundMark?.('scorch', ex, ey, r * 0.72, 0x38bdf8);
       s._emitSparks(ex, ey, 12, 0x7dd3fc, 145);
       audio.playLightning();
 
@@ -921,6 +937,8 @@ export class WeaponSystem {
       s.activeSkillBuffTimer = 2.2;
       s._recomputeStatsFromLevels();
       s.activeExplosions.push({ x: hx, y: hy, maxR: r, life: 0, dur: 0.36, color: 0xfbbf24 });
+      s.activeAuraPulses.push({ x: hx, y: hy, maxR: r * 1.15, life: 0, dur: 0.42, color: 0xfef08a });
+      s._spawnGroundMark?.('fissure', hx, hy + 12, 68, 0xfbbf24);
       s._emitSparks(hx, hy, 18, 0xfbbf24, 190);
       this._shake(150, 0.006);
       for (let i = s.activeEnemies.length - 1; i >= 0; i--) {
@@ -945,6 +963,7 @@ export class WeaponSystem {
       s._emitSparks(hx, hy, 12, 0xe879f9, 130);
       s.hero.setPosition(hx + Math.cos(dashAng) * stepDist, hy + Math.sin(dashAng) * stepDist);
       s._resolvePropCollisions();
+      s.activeAuraPulses.push({ x: s.hero.x, y: s.hero.y, maxR: 72, life: 0, dur: 0.32, color: 0xf0abfc });
       s._emitSparks(s.hero.x, s.hero.y, 16, 0xf0abfc, 160);
 
       const fanCount = 10;
@@ -969,6 +988,8 @@ export class WeaponSystem {
         proj.pierce = 3;
         proj.life = 0.85;
         proj.trailTimer = 0;
+        proj.ribbonTimer = 0;
+        if (proj.trail) proj.trail.length = 0;
         if (!proj.hitSet) proj.hitSet = new Set();
         else proj.hitSet.clear();
         swapPopPush(s.activeProjectiles, proj, '_poolIdx');
@@ -978,6 +999,8 @@ export class WeaponSystem {
       const rSq = r * r;
       const dmg = Math.round(46 * mightM);
       s.activeExplosions.push({ x: hx, y: hy, maxR: r, life: 0, dur: 0.42, color: 0x38bdf8 });
+      s.activeAuraPulses.push({ x: hx, y: hy, maxR: r * 1.12, life: 0, dur: 0.46, color: 0x7dd3fc });
+      s._spawnGroundMark?.('rune', hx, hy + 10, 76, 0x38bdf8);
       s._emitSparks(hx, hy, 22, 0x7dd3fc, 200);
       this._shake(130, 0.005);
       for (let i = s.activeEnemies.length - 1; i >= 0; i--) {
@@ -1001,6 +1024,8 @@ export class WeaponSystem {
       const rSq = r * r;
       const dmg = Math.round(62 * mightM);
       s.activeExplosions.push({ x: hx, y: hy, maxR: r, life: 0, dur: 0.36, color: 0xfb923c });
+      s.activeAuraPulses.push({ x: hx, y: hy, maxR: r * 1.1, life: 0, dur: 0.42, color: 0xfdba74 });
+      s._spawnGroundMark?.('fissure', hx, hy + 12, 72, 0xfb923c);
       s._emitSparks(hx, hy, 20, 0xfb923c, 190);
       this._shake(180, 0.0075);
       for (let i = s.activeEnemies.length - 1; i >= 0; i--) {

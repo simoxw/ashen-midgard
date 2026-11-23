@@ -286,7 +286,7 @@ const {
   recordEndlessRun
 } = await import('../src/realms.js');
 const { SpatialHashGrid, swapPopPush, swapPopRemove } = await import('../src/spatialGrid.js');
-const { getWeaponEvolutionStatus } = await import('../src/weapons.js');
+const { getWeaponEvolutionStatus, getSynergyMatrix } = await import('../src/weapons.js');
 const {
   SETTINGS_STORAGE_KEY,
   DEFAULT_SETTINGS,
@@ -294,6 +294,20 @@ const {
   saveSettings,
   resetSettings
 } = await import('../src/settings.js');
+const {
+  ALTAR_STORAGE_KEY,
+  ALTAR_ORDER,
+  ALTAR_RUNES,
+  loadAltarState,
+  getAltarBonuses,
+  getNextRuneCost,
+  canAffordAnyRune,
+  purchaseAltarRune,
+  refundAllAltarRunes,
+  computeRunEmbers,
+  grantRunEmbers
+} = await import('../src/altar.js');
+const { analyzeSpriteAnatomy, getAnimProfile, isWalkableCustomSprite, registerCustomWalkFrames } = await import('../src/spriteAnimator.js');
 
 test('2.5D Depth Layers: entità sempre sopra terreno e ombre anche con Y negative', () => {
   const testYs = [-100000, -1500, -250, -1, 0, 1, 250, 1500, 100000];
@@ -488,8 +502,8 @@ test('Config PWA & Story: manifest.json, story.json e file statici presenti', ()
     }
   }
 
-  // Verifica storie e immagini per i Regni Muspelheim & Helheim
-  for (const realmId of ['muspelheim', 'helheim']) {
+  // Verifica storie e immagini per i Regni Muspelheim, Helheim & Asgard
+  for (const realmId of ['muspelheim', 'helheim', 'asgard']) {
     const realmStory = story.realms?.[realmId];
     assert.ok(realmStory, `Storia regno mancante: ${realmId}`);
     for (const trigger of ['onGameStart', 'onBossSpawn', 'onVictory', 'onGameOver']) {
@@ -501,6 +515,41 @@ test('Config PWA & Story: manifest.json, story.json e file statici presenti', ()
     }
   }
 
+  // Verifica asset illustrati Eroi, Boss, Nemici & Prop in assets/sprites/ + manifest.json
+  const customSpriteKeys = [
+    'hero_warrior',
+    'hero_assassin',
+    'hero_mage',
+    'hero_juggernaut',
+    'boss',
+    'boss_surtr',
+    'boss_hel',
+    'boss_loki',
+    'boss_odin',
+    'enemy_swarm',
+    'enemy_fast',
+    'enemy_tank',
+    'enemy_archer',
+    'enemy_berserker',
+    'enemy_elite',
+    'prop_tree',
+    'prop_rock',
+    'prop_shrine'
+  ];
+  const spriteManifest = JSON.parse(fs.readFileSync(path.join(root, 'assets/sprites/manifest.json'), 'utf8'));
+  for (const spriteKey of customSpriteKeys) {
+    assert.equal(
+      spriteManifest.enabled.includes(spriteKey),
+      true,
+      `Manifest sprite mancante per: ${spriteKey}`
+    );
+    assert.equal(
+      fs.existsSync(path.join(root, `assets/sprites/${spriteKey}.png`)),
+      true,
+      `Sprite PNG illustrato mancante: assets/sprites/${spriteKey}.png`
+    );
+  }
+
   // Verifica strategia aggiornamento forzato SW (Network-First per codice/HTML + updateViaCache: none)
   const swSource = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
   assert.ok(swSource.includes('networkFirst'), 'sw.js deve usare networkFirst per codice e HTML');
@@ -509,8 +558,16 @@ test('Config PWA & Story: manifest.json, story.json e file statici presenti', ()
   assert.ok(
     swSource.includes('./src/realms.js') &&
       swSource.includes('./assets/story/boss_surtr.jpg') &&
-      swSource.includes('./assets/story/boss_hel.jpg'),
-    'sw.js deve pre-caricare realms.js e le vignette di Muspelheim/Helheim'
+      swSource.includes('./assets/story/boss_hel.jpg') &&
+      swSource.includes('./assets/story/asgard_intro.jpg') &&
+      swSource.includes('./assets/story/boss_asgard.jpg') &&
+      swSource.includes('./assets/story/asgard_victory.jpg') &&
+      swSource.includes('./src/altar.js') &&
+      swSource.includes('./src/spriteAnimator.js') &&
+      swSource.includes('./assets/sprites/boss_odin.png') &&
+      swSource.includes('./assets/sprites/enemy_fast.png') &&
+      swSource.includes('./assets/sprites/prop_shrine.png'),
+    'sw.js deve pre-caricare realms.js, altar.js, spriteAnimator.js, vignette e tutti gli sprite illustrati'
   );
   const htmlSource = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   assert.ok(htmlSource.includes("updateViaCache: 'none'"), 'index.html deve registrare SW con updateViaCache: none');
@@ -1570,4 +1627,288 @@ test('Modalità Infinita: Ondate oltre 240s, Boss Ciclici con Forziere & Record 
 
   globalThis.document = prevDoc;
 });
+
+test('Altare delle Rune (Braci, Acquisto, Respec, Rinascita), Tabella Sinergie & Sprite Illustrati HD', async () => {
+  const prevDoc = globalThis.document;
+  globalThis.document = undefined;
+
+  // 1. Altare delle Rune: valuta Braci Runiche, acquisto, max rank, respec 100%, bonus
+  localStorage.removeItem(ALTAR_STORAGE_KEY);
+  const initialAltar = loadAltarState();
+  assert.equal(initialAltar.embers, 0);
+  assert.equal(ALTAR_ORDER.length, 7);
+
+  const reward = computeRunEmbers({
+    kills: 200,
+    elapsedSec: 240,
+    miniBossesSlain: 2,
+    bossDefeated: true,
+    victory: true,
+    xpBonusMult: 1.6
+  });
+  assert.ok(reward >= 100, 'Una vittoria con boss e Titanomachia deve fruttare abbondanti Braci Runiche');
+
+  const granted = grantRunEmbers({
+    kills: 150,
+    elapsedSec: 200,
+    miniBossesSlain: 1,
+    bossDefeated: true,
+    victory: true,
+    xpBonusMult: 1.2
+  });
+  assert.ok(granted.gainedEmbers >= 80);
+  assert.equal(canAffordAnyRune(granted.state), true);
+
+  const mightCost = getNextRuneCost('might', 0);
+  const buyRes = purchaseAltarRune('might');
+  assert.equal(buyRes.ok, true);
+  assert.equal(buyRes.state.ranks.might, 1);
+  assert.equal(buyRes.state.embers, granted.state.embers - mightCost);
+
+  const emptySpend = purchaseAltarRune('revival');
+  assert.equal(emptySpend.ok, false);
+  assert.equal(emptySpend.reason, 'insufficient_embers');
+
+  const refunded = refundAllAltarRunes();
+  assert.equal(refunded.ok, true);
+  assert.equal(refunded.state.embers, granted.state.embers, 'Il respec deve restituire il 100% delle Braci spese');
+  assert.equal(refunded.state.ranks.might, 0);
+
+  const fullBonuses = getAltarBonuses({
+    embers: 0,
+    ranks: {
+      vitality: 5,
+      might: 5,
+      agility: 5,
+      wisdom: 5,
+      greed: 4,
+      ward: 4,
+      revival: 1
+    }
+  });
+  assert.equal(fullBonuses.maxHpBonus, 60);
+  assert.equal(fullBonuses.mightAdd, 0.3);
+  assert.equal(fullBonuses.speedMultAdd, 0.2);
+  assert.equal(fullBonuses.xpGainMult, 1.5);
+  assert.equal(fullBonuses.magnetMultAdd, 0.6);
+  assert.equal(fullBonuses.damageReduction, 0.24);
+  assert.equal(fullBonuses.revivals, 1);
+  assert.equal(ALTAR_RUNES.revival.maxRank, 1);
+
+  // 2. Tabella Sinergie ed Evoluzioni (Menu vs Run attiva + Filtro Eroe)
+  const idleMatrix = getSynergyMatrix({}, {}, 'warrior', false);
+  assert.equal(idleMatrix.length, 3, 'Il filtro per Astrid deve mostrare le sue 3 armi esclusive');
+  assert.equal(idleMatrix.every((row) => row.stateKind === 'idle'), true);
+
+  const activeMatrix = getSynergyMatrix(
+    { axe: 5, might: 1, blades: 5, spear: 3 },
+    { axe: true },
+    'all',
+    true
+  );
+  assert.equal(activeMatrix.length, 12, 'La matrice completa deve coprire tutte le 12 armi');
+  const axeRow = activeMatrix.find((r) => r.weaponId === 'axe');
+  const bladesRow = activeMatrix.find((r) => r.weaponId === 'blades');
+  const spearRow = activeMatrix.find((r) => r.weaponId === 'spear');
+  assert.equal(axeRow.stateKind, 'evolved');
+  assert.equal(axeRow.stateLabel, 'EVOLUTA');
+  assert.equal(bladesRow.stateKind, 'missing_passive');
+  assert.ok(bladesRow.stateLabel.startsWith('MANCA '));
+  assert.equal(spearRow.stateKind, 'in_progress');
+
+  // 3. Integrazione in GameScene: bonus Altare (xpGainMult, damageReduction, Fiamma del Valhalla Revival) & Custom Sprite Key Preservation
+  const scene = new GameScene();
+  let lastHud = null;
+  let lastEnd = null;
+  const dialogues = [];
+  scene.configureBridge(
+    {
+      onHudUpdate: (h) => { lastHud = h; },
+      onRunEnded: (r) => { lastEnd = r; },
+      onDialogue: (d) => dialogues.push(d)
+    },
+    null
+  );
+  scene.preload();
+  scene.create();
+
+  await scene.startNewRun({
+    heroId: 'warrior',
+    startingWeaponId: 'axe',
+    textureKey: 'hero_warrior',
+    effectiveStats: {
+      xpGainMult: 1.25,
+      damageReduction: 0.2,
+      revivals: 1
+    }
+  });
+
+  assert.equal(scene.stats.revivalsLeft, 1);
+  assert.equal(lastHud?.revivalsLeft, 1);
+  assert.equal(scene.stats.xpGainMult, 1.25);
+
+  const xpBefore = scene.stats.xp;
+  scene._grantXp(4);
+  assert.equal(scene.stats.xp - xpBefore, 5, 'Il bonus EXP dell Altare deve moltiplicare i punti EXP raccolti (4 * 1.25 = 5)');
+
+  // Verifica riduzione danno Altare (25 * 0.8 = 20) + Fiamma del Valhalla salva l eroe al posto del Game Over
+  scene.stats.hp = 20;
+  scene.stats.invulnTimer = 0;
+  const killer = scene._spawnEnemy('swarm', 0, 0, 5);
+  killer.damage = 25;
+  scene._onEnemyTouchHero(killer);
+  assert.equal(scene.gameState, 'PLAYING', 'La Fiamma del Valhalla deve impedire il Game Over alla prima morte');
+  assert.equal(scene.stats.revivalsLeft, 0);
+  assert.equal(scene.stats.hp, Math.round(scene.stats.maxHp * 0.5));
+  assert.equal(dialogues.some((d) => d.triggerKey === 'altar_revival'), true);
+  assert.equal(lastEnd, null);
+
+  // Seconda morte senza rinascite -> Game Over effettivo
+  scene.stats.hp = 1;
+  scene.stats.invulnTimer = 0;
+  scene._onEnemyTouchHero(killer);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(lastEnd?.victory, false);
+
+  // 4. Custom Illustrated Sprite: protezione senza frame sintetizzati + ciclo 8 frame quando generati
+  scene.customIllustratedKeys.add('hero_warrior');
+  scene.hero.setTexture('hero_warrior');
+  scene._applyWalkTextureFrame(scene.hero, 'hero_warrior', 2, true);
+  assert.equal(scene.hero.texture, 'hero_warrior', 'Senza frame sintetizzati gli sprite illustrati HD non devono usare vecchi frame procedurali');
+
+  // Con 8 frame sintetizzati registrati: camminata cicla tra _f0.._f7 e sosta torna alla posa neutra
+  scene.customWalkFrameCounts.set('hero_warrior', 8);
+  const origExists = scene.textures.exists;
+  scene.textures.exists = (k) => origExists(k) || /^hero_warrior_f[0-7]$/.test(k);
+  scene._applyWalkTextureFrame(scene.hero, 'hero_warrior', 6.2, true);
+  assert.equal(scene.hero.texture, 'hero_warrior_f6', 'La camminata deve usare gli 8 frame articolati sintetizzati');
+  scene._applyWalkTextureFrame(scene.hero, 'hero_warrior', 0, false);
+  assert.equal(scene.hero.texture, 'hero_warrior', 'Da fermo deve tornare alla posa neutra illustrata');
+
+  // Verifica profili e rilevamento anatomico di spriteAnimator.js
+  assert.equal(getAnimProfile('hero_mage').mode, 'hover');
+  assert.equal(getAnimProfile('boss_hel').mode, 'hover');
+  assert.equal(getAnimProfile('hero_warrior').mode, 'stride');
+  assert.equal(getAnimProfile('hero_warrior').frames, 8);
+
+  // Griglia 40x60 con busto pieno e due gambe separate attorno a x=22 (gap di 3px tra x=21..23)
+  const w = 40;
+  const h = 60;
+  const rgba = new Uint8Array(w * h * 4);
+  for (let y = 6; y < 56; y++) {
+    for (let x = 10; x < 31; x++) {
+      const isLegBand = y >= 36;
+      const inGap = isLegBand && x >= 21 && x <= 23;
+      if (!inGap) {
+        rgba[(y * w + x) * 4 + 3] = 255;
+      }
+    }
+  }
+  const anatomy = analyzeSpriteAnatomy(rgba, w, h, 0.6);
+  assert.equal(anatomy.xMin, 10);
+  assert.equal(anatomy.xMax, 30);
+  assert.ok(anatomy.splitX >= 21 && anatomy.splitX <= 23, `splitX (${anatomy.splitX}) deve individuare il varco naturale tra le gambe`);
+
+  // 5. Fallback scale eroe aggiornato a 76px (0.382 HD) + test cooldown abilità E di 1s in 1s + modale Sinergie sopra Pausa
+  assert.equal(scene._computeSpriteScale('hero_assassin', 76, 0.382), 0.382);
+
+  await scene.startNewRun({ heroId: 'warrior', startingWeaponId: 'axe', textureKey: 'hero_warrior' });
+  const observedSecs = [];
+  scene.configureBridge(
+    {
+      onHudUpdate: (h) => {
+        if (h?.activeSkill && !h.activeSkill.ready) {
+          const sec = Math.ceil(h.activeSkill.cooldownRemaining);
+          if (observedSecs.at(-1) !== sec) observedSecs.push(sec);
+        }
+      }
+    },
+    null
+  );
+  assert.equal(scene.triggerActiveSkill(), true);
+  assert.equal(observedSecs[0], 14, 'All attivazione il cooldown deve partire subito a 14s');
+  for (let step = 0; step < 80; step++) {
+    scene.update(1000 + step * 50, 50);
+  }
+  assert.deepEqual(
+    observedSecs.slice(0, 5),
+    [14, 13, 12, 11, 10],
+    'Il cooldown dell abilità unica deve scendere regolarmente di 1s in 1s'
+  );
+
+  const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+  const cssSource = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
+  const mainSource = fs.readFileSync(path.join(root, 'src/main.js'), 'utf8');
+  assert.ok(cssSource.includes('#synergy-modal') && cssSource.includes('z-index: 65'), 'Il modale Sinergie deve avere z-index superiore al modale Pausa');
+  assert.ok(mainSource.includes("synergyOpenedFromPause = true;\n    el.pauseModal?.classList.add('hidden')"), 'Aprendo Sinergie dalla Pausa il pannello Pausa deve nascondersi');
+
+  // 6. Migliorie Grafiche: animazione quadrupede Lunge, guardia prop statici, marchi al suolo, ribbon trails & scala adattiva nemici/prop
+  assert.equal(getAnimProfile('enemy_fast').mode, 'lunge');
+  assert.equal(getAnimProfile('enemy_tank').mode, 'stride');
+  assert.equal(isWalkableCustomSprite('prop_tree'), false);
+  assert.equal(isWalkableCustomSprite('prop_shrine'), false);
+  assert.equal(isWalkableCustomSprite('enemy_fast'), true);
+  assert.equal(registerCustomWalkFrames(scene.textures, 'prop_tree', { width: 320, height: 320 }), 0);
+
+  // Marchi al suolo (fissure / rune / scorch) e decadenza temporale
+  scene._spawnGroundMark('rune', 40, 60, 48, 0xfbbf24);
+  assert.equal(scene.activeGroundMarks.length, 1);
+  scene._updateGroundMarks(1.3);
+  assert.equal(scene.activeGroundMarks.length, 1);
+  scene._updateGroundMarks(1.4);
+  assert.equal(scene.activeGroundMarks.length, 0, 'I marchi a terra devono svanire allo scadere della durata');
+
+  // Scia a nastro proiettili & pulizia al riciclo
+  scene._spawnEnemy('swarm', 0, 0, 120);
+  scene.timers.axe = 0;
+  scene.update(6000, 33);
+  const trackedProj = scene.activeProjectiles.find((p) => p.active);
+  assert.ok(trackedProj, 'Dovrebbe esistere un proiettile attivo');
+  trackedProj.x += 18;
+  trackedProj.ribbonTimer = 0.05;
+  scene._updateProjectiles(0.02);
+  assert.ok(Array.isArray(trackedProj.trail) && trackedProj.trail.length >= 1, 'Il proiettile deve registrare i punti scia');
+  scene._recycleProjectile(trackedProj);
+  assert.equal(trackedProj.trail.length, 0, 'Il riciclo del proiettile deve svuotare la scia');
+
+  // Calibrazione scala adattiva per nemici & prop illustrati custom (256px / 320px)
+  scene.customIllustratedKeys.add('enemy_tank');
+  scene.customIllustratedKeys.add('prop_shrine');
+  scene.textures.get = (k) => {
+    if (k === 'enemy_tank') return { getSourceImage: () => ({ width: 320, height: 320 }) };
+    if (k === 'prop_shrine') return { getSourceImage: () => ({ width: 256, height: 256 }) };
+    return null;
+  };
+  const customTank = scene._spawnEnemy('tank', 0, 0, 140);
+  assert.equal(customTank.baseScale, Number((60 / 320).toFixed(4)));
+  const testShrine = scene.shrineItems[0];
+  scene._refreshPropMetrics(testShrine);
+  assert.equal(testShrine.scaleX, Number((56 / 256).toFixed(4)));
+
+  // Orientamento specchiato corretto per Astrid (hero_warrior) e Freya (hero_mage) vs Skadi/Bjorn
+  scene.customIllustratedKeys.add('hero_warrior');
+  scene.customIllustratedKeys.add('hero_mage');
+  scene.customIllustratedKeys.add('hero_assassin');
+  scene.heroBaseTexKey = 'hero_warrior';
+  scene.wasd.right.isDown = true;
+  scene.wasd.left.isDown = false;
+  scene._updateHeroMovement(0.016);
+  assert.equal(scene.hero.flipX, true, 'Astrid illustrata (guarda a sinistra) andando a destra deve avere flipX = true');
+  scene.wasd.right.isDown = false;
+  scene.wasd.left.isDown = true;
+  scene._updateHeroMovement(0.016);
+  assert.equal(scene.hero.flipX, false, 'Astrid illustrata andando a sinistra deve avere flipX = false');
+
+  scene.heroBaseTexKey = 'hero_assassin';
+  scene.wasd.right.isDown = true;
+  scene.wasd.left.isDown = false;
+  scene._updateHeroMovement(0.016);
+  assert.equal(scene.hero.flipX, false, 'Skadi illustrata (guarda a destra) andando a destra deve avere flipX = false');
+  scene.wasd.right.isDown = false;
+
+  globalThis.document = prevDoc;
+});
+
+
+
 

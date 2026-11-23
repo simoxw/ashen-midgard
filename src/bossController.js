@@ -80,6 +80,7 @@ export class BossController {
       boss.setTexture(stage2Key);
     }
     boss.baseTexKey = stage2Key;
+    s._refreshBossSpriteMetrics?.(boss);
     boss.displayName = realmBoss.stage2Name || 'Odino, il Padre Caduto';
     boss.speed = Math.round((boss.speed || 78) * 1.15);
     boss.damage = Math.round((boss.damage || 44) * 1.12);
@@ -87,6 +88,9 @@ export class BossController {
     audio.playBossAlarm();
     s._emitSparks(boss.x, boss.y, 28, 0xfbbf24, 220);
     s.activeExplosions.push({ x: boss.x, y: boss.y, maxR: 155, life: 0, dur: 0.45, color: 0xfbbf24 });
+    s.activeAuraPulses.push({ x: boss.x, y: boss.y, maxR: 205, life: 0, dur: 0.52, color: 0xfde047 });
+    s._spawnGroundMark?.('rune', boss.x, boss.y + 18, 72, 0xfbbf24);
+    if (s.bossGlow) s.bossGlow.setTint?.(0xfbbf24);
     if (s.settings?.screenShake !== false) {
       s.cameras?.main?.shake?.(260, 0.009);
     }

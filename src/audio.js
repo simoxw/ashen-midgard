@@ -414,6 +414,48 @@ export class AudioEngine {
     });
   }
 
+  playAltarRune() {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    const notes = [392.0, 587.33, 783.99];
+    notes.forEach((f, idx) => {
+      const start = now + idx * 0.05;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, start);
+      gain.gain.setValueAtTime(0.18, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.28);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+  }
+
+  playRevival() {
+    if (this.muted) return;
+    this.unlock();
+    if (!this.ctx || this.ctx.state !== 'running') return;
+    const now = this.ctx.currentTime;
+    const notes = [293.66, 440.0, 587.33, 880.0, 1174.66];
+    notes.forEach((f, idx) => {
+      const start = now + idx * 0.055;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, start);
+      gain.gain.setValueAtTime(0.22, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.45);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start(start);
+      osc.stop(start + 0.48);
+    });
+  }
+
   playHit(isCrit = false) {
     if (!this._canPlay('hit', 45)) return;
     const now = this.ctx.currentTime;

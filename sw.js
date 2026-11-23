@@ -11,7 +11,7 @@
  *   - Immagini/Media/Font: aggiornamento in background nella stessa CACHE_NAME versionata.
  */
 
-const CACHE_VERSION = 'v6-0';
+const CACHE_VERSION = 'v6-4';
 const CACHE_NAME = `ashen-midgard-${CACHE_VERSION}`;
 
 const IS_AISTUDIO_PREVIEW =
@@ -54,10 +54,29 @@ const PRECACHE_ASSETS = [
   './assets/story/boss_asgard.jpg',
   './assets/story/asgard_victory.jpg',
   './assets/sprites/manifest.json',
+  './assets/sprites/hero_warrior.png',
+  './assets/sprites/hero_assassin.png',
+  './assets/sprites/hero_mage.png',
+  './assets/sprites/hero_juggernaut.png',
+  './assets/sprites/boss.png',
+  './assets/sprites/boss_surtr.png',
+  './assets/sprites/boss_hel.png',
+  './assets/sprites/boss_loki.png',
+  './assets/sprites/boss_odin.png',
+  './assets/sprites/enemy_swarm.png',
+  './assets/sprites/enemy_fast.png',
+  './assets/sprites/enemy_tank.png',
+  './assets/sprites/enemy_archer.png',
+  './assets/sprites/enemy_berserker.png',
+  './assets/sprites/enemy_elite.png',
+  './assets/sprites/prop_tree.png',
+  './assets/sprites/prop_rock.png',
+  './assets/sprites/prop_shrine.png',
   './src/main.js',
   './src/settings.js',
   './src/spatialGrid.js',
   './src/weapons.js',
+  './src/altar.js',
   './src/proceduralTextures.js',
   './src/weaponSystem.js',
   './src/bossController.js',
@@ -65,6 +84,7 @@ const PRECACHE_ASSETS = [
   './src/heroes.js',
   './src/codex.js',
   './src/hdSprites.js',
+  './src/spriteAnimator.js',
   './src/audio.js',
   './src/storyManager.js',
   './src/gameScene.js',

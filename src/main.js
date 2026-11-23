@@ -41,6 +41,19 @@ import {
   saveSettings,
   resetSettings
 } from './settings.js';
+import {
+  ALTAR_ORDER,
+  ALTAR_RUNES,
+  loadAltarState,
+  getAltarBonuses,
+  getNextRuneCost,
+  getTotalSpentEmbers,
+  canAffordAnyRune,
+  purchaseAltarRune,
+  refundAllAltarRunes,
+  grantRunEmbers
+} from './altar.js';
+import { getSynergyMatrix } from './weapons.js';
 
 const RECORDS_STORAGE_KEY = 'ashen_midgard_records_v1';
 
@@ -151,6 +164,7 @@ const el = {
   hudKills: document.getElementById('hud-kills'),
   hudBuildStrip: document.getElementById('hud-build-strip'),
   hudBuffBar: document.getElementById('hud-buff-bar'),
+  hudRevivalTag: document.getElementById('hud-revival-tag'),
   pauseBtn: document.getElementById('pause-btn'),
   activeSkillBtn: document.getElementById('active-skill-btn'),
   activeSkillRing: document.getElementById('active-skill-ring'),
@@ -180,6 +194,21 @@ const el = {
   chestDesc: document.getElementById('chest-desc'),
   chestClaimBtn: document.getElementById('chest-claim-btn'),
 
+  altarBtn: document.getElementById('altar-btn'),
+  altarModal: document.getElementById('altar-modal'),
+  altarEmbersBalance: document.getElementById('altar-embers-balance'),
+  altarSummaryBar: document.getElementById('altar-summary-bar'),
+  altarRuneList: document.getElementById('altar-rune-list'),
+  altarRefundBtn: document.getElementById('altar-refund-btn'),
+  altarCloseBtn: document.getElementById('altar-close-btn'),
+
+  titleSynergyBtn: document.getElementById('title-synergy-btn'),
+  synergyModal: document.getElementById('synergy-modal'),
+  synergySummary: document.getElementById('synergy-summary'),
+  synergyTabs: document.getElementById('synergy-tabs'),
+  synergyList: document.getElementById('synergy-list'),
+  synergyCloseBtn: document.getElementById('synergy-close-btn'),
+
   codexBtn: document.getElementById('codex-btn'),
   codexModal: document.getElementById('codex-modal'),
   codexProgress: document.getElementById('codex-progress'),
@@ -189,6 +218,7 @@ const el = {
 
   pauseModal: document.getElementById('pause-modal'),
   resumeBtn: document.getElementById('resume-btn'),
+  pauseSynergyBtn: document.getElementById('pause-synergy-btn'),
   pauseSettingsBtn: document.getElementById('pause-settings-btn'),
   restartBtn: document.getElementById('restart-btn'),
   quitBtn: document.getElementById('quit-btn'),
@@ -225,6 +255,7 @@ const el = {
   endMetaXpFill: document.getElementById('end-meta-xp-fill'),
   endMetaLevelUp: document.getElementById('end-meta-levelup'),
   endMetaUnlocks: document.getElementById('end-meta-unlocks'),
+  endAltarEmbers: document.getElementById('end-altar-embers'),
   endCodexUnlocks: document.getElementById('end-codex-unlocks'),
   endRealmUnlock: document.getElementById('end-realm-unlock'),
   endDamageCard: document.getElementById('end-damage-card'),
@@ -335,6 +366,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     const hero = HERO_ROSTER[heroId];
     const lvInfo = getHeroLevelFromXp(metaState.heroXp[heroId] || 0);
     const perks = getPerksForHeroLevel(heroId, lvInfo.level);
+    const altar = getAltarBonuses(loadAltarState());
+    const effectiveStats = {
+      ...perks,
+      maxHp: perks.maxHp + altar.maxHpBonus,
+      speed: Math.round(perks.speed * (1 + altar.speedMultAdd)),
+      mightMult: Number((perks.mightMult + altar.mightAdd).toFixed(3)),
+      magnetMult: Number(((perks.magnetMult || 1) + altar.magnetMultAdd).toFixed(3)),
+      xpGainMult: altar.xpGainMult,
+      damageReduction: altar.damageReduction,
+      revivals: altar.revivals
+    };
     const storedWep = metaState.selectedWeapons[heroId];
     const startingWeaponId = perks.unlockedWeapons.includes(storedWep)
       ? storedWep
@@ -351,7 +393,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       heroId,
       startingWeaponId,
       textureKey: hero.textureKey,
-      effectiveStats: perks,
+      effectiveStats,
       realmId,
       challengeId,
       runMode
@@ -506,7 +548,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         card.setAttribute('aria-pressed', String(hId === activeHeroId));
         card.innerHTML = `
           <div class="hero-avatar" style="color:${hero.accent};border-color:${hero.accent}55">
-            ${HERO_PORTRAITS[hId] || ''}
+            <img class="hero-avatar-img" src="./assets/sprites/${hero.textureKey}.png" alt="${hero.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling?.classList.remove('hidden')" />
+            <span class="hero-avatar-fallback hidden">${HERO_PORTRAITS[hId] || ''}</span>
           </div>
           <span class="hero-card-name">${hero.name}</span>
           <span class="hero-card-role">${hero.title}</span>
@@ -524,6 +567,8 @@ window.addEventListener('DOMContentLoaded', async () => {
       });
     }
 
+    const altarBonuses = getAltarBonuses(loadAltarState());
+
     if (el.heroDetailPanel) {
       el.heroDetailPanel.style.setProperty('--hero-accent', activeHero.accent);
     }
@@ -531,9 +576,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       el.selectedHeroDesc.textContent = `${activeHero.name} (${activeHero.title}) — ${activeHero.summary}`;
     }
     if (el.selectedHeroStats) {
-      const dmgPct = Math.round(activePerks.mightMult * 100);
+      const totHp = activePerks.maxHp + altarBonuses.maxHpBonus;
+      const totSpd = Math.round(activePerks.speed * (1 + altarBonuses.speedMultAdd));
+      const dmgPct = Math.round((activePerks.mightMult + altarBonuses.mightAdd) * 100);
       const critPct = Math.round(activePerks.critChance * 100);
-      el.selectedHeroStats.textContent = `HP ${activePerks.maxHp} · VEL ${activePerks.speed} · DANNO ${dmgPct}% · CRIT ${critPct}%`;
+      el.selectedHeroStats.textContent = `HP ${totHp} · VEL ${totSpd} · DANNO ${dmgPct}% · CRIT ${critPct}%`;
     }
 
     if (el.weaponSelectorList) {
@@ -599,6 +646,166 @@ window.addEventListener('DOMContentLoaded', async () => {
   };
 
   let activeCodexCategory = 'all';
+  let activeSynergyHero = 'all';
+  let synergyOpenedFromPause = false;
+
+  const updateAltarButtonLabel = () => {
+    if (!el.altarBtn) return;
+    const state = loadAltarState();
+    const ready = canAffordAnyRune(state);
+    el.altarBtn.textContent = `Altare (${state.embers})`;
+    el.altarBtn.classList.toggle('btn-altar-ready', ready);
+  };
+
+  const renderAltarModal = () => {
+    const state = loadAltarState();
+    const bonuses = getAltarBonuses(state);
+    const totalSpent = getTotalSpentEmbers(state);
+
+    if (el.altarEmbersBalance) {
+      el.altarEmbersBalance.textContent = `${state.embers} BRACI`;
+    }
+    if (el.altarSummaryBar) {
+      const parts = [];
+      if (bonuses.maxHpBonus > 0) parts.push(`+${bonuses.maxHpBonus} HP`);
+      if (bonuses.mightAdd > 0) parts.push(`+${Math.round(bonuses.mightAdd * 100)}% Danno`);
+      if (bonuses.speedMultAdd > 0) parts.push(`+${Math.round(bonuses.speedMultAdd * 100)}% Vel`);
+      if (bonuses.xpGainMult > 1) parts.push(`+${Math.round((bonuses.xpGainMult - 1) * 100)}% EXP`);
+      if (bonuses.magnetMultAdd > 0) parts.push(`+${Math.round(bonuses.magnetMultAdd * 100)}% Magnete`);
+      if (bonuses.damageReduction > 0) parts.push(`-${Math.round(bonuses.damageReduction * 100)}% Danni`);
+      if (bonuses.revivals > 0) parts.push('1 Rinascita');
+      el.altarSummaryBar.textContent = parts.length > 0
+        ? `Benedizioni attive: ${parts.join(' · ')}`
+        : 'Sopravvivi e sconfiggi nemici per ottenere Braci Runiche e incidere bonus permanenti.';
+    }
+    if (el.altarRefundBtn) {
+      el.altarRefundBtn.disabled = totalSpent <= 0;
+      el.altarRefundBtn.textContent = totalSpent > 0 ? `Rimborsa (+${totalSpent})` : 'Rimborsa Tutto';
+    }
+
+    if (el.altarRuneList) {
+      el.altarRuneList.innerHTML = '';
+      ALTAR_ORDER.forEach((runeId) => {
+        const rune = ALTAR_RUNES[runeId];
+        const rank = state.ranks[runeId] || 0;
+        const nextCost = getNextRuneCost(runeId, rank);
+        const isMax = nextCost === null;
+        const canBuy = !isMax && state.embers >= nextCost;
+
+        const pipsHtml = Array.from({ length: rune.maxRank }, (_, i) =>
+          `<span class="altar-pip${i < rank ? ' is-filled' : ''}"></span>`
+        ).join('');
+
+        const card = document.createElement('article');
+        card.className = 'altar-rune-card';
+        card.style.setProperty('--rune-accent', rune.accent);
+        card.innerHTML = `
+          <div class="altar-rune-info">
+            <div class="altar-rune-head">
+              <span class="altar-rune-name">${rune.name}</span>
+              <span class="altar-rune-tag" style="color:${rune.accent}">${rune.tag}</span>
+            </div>
+            <div class="altar-rune-desc">${rune.unitLabel} · Attuale: <strong>${rune.formatBonus(rank)}</strong></div>
+            <div class="altar-rune-pips">
+              ${pipsHtml}
+              <span class="altar-rank-text">${rank}/${rune.maxRank}</span>
+            </div>
+          </div>
+          <button type="button" class="altar-buy-btn${isMax ? ' is-max' : ''}" ${!canBuy ? 'disabled' : ''}>
+            ${isMax ? 'MAX' : `${nextCost} BRACI`}
+          </button>
+        `;
+
+        const buyBtn = card.querySelector('.altar-buy-btn');
+        if (buyBtn && canBuy) {
+          buyBtn.addEventListener('click', () => {
+            const res = purchaseAltarRune(runeId);
+            if (res.ok) {
+              audio.unlock();
+              audio.playAltarRune();
+              renderAltarModal();
+              renderHeroSelection();
+              updateAltarButtonLabel();
+            }
+          });
+        }
+        el.altarRuneList.appendChild(card);
+      });
+    }
+  };
+
+  const SYNERGY_TABS = [
+    { id: 'all', label: 'Tutte (12)' },
+    { id: 'warrior', label: 'Astrid' },
+    { id: 'assassin', label: 'Skadi' },
+    { id: 'mage', label: 'Freya' },
+    { id: 'juggernaut', label: 'Bjorn' }
+  ];
+
+  const renderSynergyModal = (heroFilter = activeSynergyHero, isRunActive = false) => {
+    activeSynergyHero = heroFilter;
+    const levels = isRunActive ? (gameScene.levels || {}) : {};
+    const evolved = isRunActive ? (gameScene.evolvedWeapons || {}) : {};
+    const rows = getSynergyMatrix(levels, evolved, activeSynergyHero, isRunActive);
+
+    if (el.synergySummary) {
+      if (isRunActive) {
+        const evolvedCount = Object.values(evolved).filter(Boolean).length;
+        el.synergySummary.textContent = `EVOLUTE: ${evolvedCount} / 12`;
+      } else {
+        el.synergySummary.textContent = `${rows.length} ARMI`;
+      }
+    }
+
+    if (el.synergyTabs) {
+      el.synergyTabs.innerHTML = '';
+      SYNERGY_TABS.forEach((tab) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `codex-tab${tab.id === activeSynergyHero ? ' is-active' : ''}`;
+        btn.textContent = tab.label;
+        btn.addEventListener('click', () => {
+          audio.playUiClick();
+          renderSynergyModal(tab.id, isRunActive);
+        });
+        el.synergyTabs.appendChild(btn);
+      });
+    }
+
+    if (el.synergyList) {
+      el.synergyList.innerHTML = '';
+      rows.forEach((row) => {
+        const card = document.createElement('article');
+        const extraClass = row.stateKind === 'evolved'
+          ? ' is-evolved'
+          : row.stateKind === 'ready'
+            ? ' is-ready'
+            : '';
+        card.className = `synergy-row${extraClass}`;
+        card.style.setProperty('--evo-accent', row.evolutionAccent);
+        card.innerHTML = `
+          <div class="synergy-row-head">
+            <span class="synergy-evo-title">${row.evolutionName}</span>
+            <span class="synergy-status-tag" style="color:${row.stateColor}">${row.stateLabel}</span>
+          </div>
+          <div class="synergy-pair-line">
+            <span class="synergy-item-chip" style="border-color:${row.weaponAccent}55">
+              <span class="synergy-item-chip-icon" style="color:${row.weaponAccent}">${UPGRADE_ICONS[row.weaponId] || ''}</span>
+              <span>${row.weaponName}${isRunActive && row.weaponLevel > 0 ? ` Lv.${row.weaponLevel}` : ''}</span>
+            </span>
+            <span class="synergy-plus">+</span>
+            <span class="synergy-item-chip" style="border-color:${row.passiveAccent}55">
+              <span class="synergy-item-chip-icon" style="color:${row.passiveAccent}">${UPGRADE_ICONS[row.passiveId] || ''}</span>
+              <span>${row.passiveName}${isRunActive && row.passiveLevel > 0 ? ` Lv.${row.passiveLevel}` : ''}</span>
+            </span>
+            <span class="synergy-owner">${row.heroName}</span>
+          </div>
+          <p class="synergy-desc">${row.evolutionDesc}</p>
+        `;
+        el.synergyList.appendChild(card);
+      });
+    }
+  };
 
   const updateCodexButtonLabel = () => {
     if (!el.codexBtn) return;
@@ -711,6 +918,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   renderChallengeSelection();
   renderHeroSelection();
   renderTitleRecords();
+  updateAltarButtonLabel();
   updateCodexButtonLabel();
   syncSettingsUi();
   setupPwaExperience();
@@ -862,6 +1070,16 @@ window.addEventListener('DOMContentLoaded', async () => {
           }
         }
       }
+      if (el.hudRevivalTag) {
+        const revCount = data.revivalsLeft || 0;
+        if (hudCache.revCount !== revCount) {
+          hudCache.revCount = revCount;
+          el.hudRevivalTag.classList.toggle('hidden', revCount <= 0);
+          if (revCount > 0) {
+            el.hudRevivalTag.textContent = `RINASCITA x${revCount}`;
+          }
+        }
+      }
       if (el.activeSkillBtn && data.activeSkill) {
         const sk = data.activeSkill;
         if (hudCache.skillKey !== sk.id) {
@@ -882,7 +1100,7 @@ window.addEventListener('DOMContentLoaded', async () => {
           hudCache.skillActive = activeOn;
           el.activeSkillBtn.classList.toggle('is-active', activeOn);
         }
-        const label = ready ? (sk.shortName || 'ATTIVA') : `${Math.ceil(sk.cooldownRemaining)}s`;
+        const label = ready ? (sk.shortName || 'ATTIVA') : `${Math.max(1, Math.ceil(sk.cooldownRemaining))}s`;
         if (el.activeSkillLabel && hudCache.skillLabel !== label) {
           hudCache.skillLabel = label;
           el.activeSkillLabel.textContent = label;
@@ -1054,13 +1272,19 @@ window.addEventListener('DOMContentLoaded', async () => {
         realmState = recordEndlessRun(realmCfg.id, result, records);
       }
 
+      const emberOutcome = grantRunEmbers(result);
       const codexUpdate = recordRunCodexProgress(result);
       renderRealmSelection();
       renderModeSelection();
       renderChallengeSelection();
       renderTitleRecords();
       renderHeroSelection();
+      updateAltarButtonLabel();
       updateCodexButtonLabel();
+
+      if (el.endAltarEmbers) {
+        el.endAltarEmbers.textContent = `+${emberOutcome.gainedEmbers} Braci Runiche · Totale Altare: ${emberOutcome.state.embers}`;
+      }
 
       if (el.gameHud) el.gameHud.classList.add('hidden');
       if (el.bossHud) el.bossHud.classList.add('hidden');
@@ -1242,9 +1466,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.chestModal?.classList.remove('flex');
     el.codexModal?.classList.add('hidden');
     el.codexModal?.classList.remove('flex');
+    el.altarModal?.classList.add('hidden');
+    el.altarModal?.classList.remove('flex');
+    el.synergyModal?.classList.add('hidden');
+    el.synergyModal?.classList.remove('flex');
     el.settingsModal?.classList.add('hidden');
     el.settingsModal?.classList.remove('flex');
     el.hudBuffBar?.classList.add('hidden');
+    el.hudRevivalTag?.classList.add('hidden');
     el.bossHud?.classList.add('hidden');
     el.gameHud?.classList.remove('hidden');
 
@@ -1357,6 +1586,60 @@ window.addEventListener('DOMContentLoaded', async () => {
     await startGameFlow();
   });
 
+  el.altarBtn?.addEventListener('click', () => {
+    audio.unlock();
+    audio.playUiClick();
+    renderAltarModal();
+    el.altarModal?.classList.remove('hidden');
+    el.altarModal?.classList.add('flex');
+  });
+
+  el.altarRefundBtn?.addEventListener('click', () => {
+    const res = refundAllAltarRunes();
+    if (res.ok) {
+      audio.playUiClick();
+      renderAltarModal();
+      renderHeroSelection();
+      updateAltarButtonLabel();
+    }
+  });
+
+  el.altarCloseBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    el.altarModal?.classList.add('hidden');
+    el.altarModal?.classList.remove('flex');
+  });
+
+  el.titleSynergyBtn?.addEventListener('click', () => {
+    audio.unlock();
+    audio.playUiClick();
+    synergyOpenedFromPause = false;
+    renderSynergyModal(metaState.selectedHero || 'all', false);
+    el.synergyModal?.classList.remove('hidden');
+    el.synergyModal?.classList.add('flex');
+  });
+
+  el.pauseSynergyBtn?.addEventListener('click', () => {
+    audio.unlock();
+    audio.playUiClick();
+    synergyOpenedFromPause = true;
+    el.pauseModal?.classList.add('hidden');
+    el.pauseModal?.classList.remove('flex');
+    renderSynergyModal('all', true);
+    el.synergyModal?.classList.remove('hidden');
+    el.synergyModal?.classList.add('flex');
+  });
+
+  el.synergyCloseBtn?.addEventListener('click', () => {
+    audio.playUiClick();
+    el.synergyModal?.classList.add('hidden');
+    el.synergyModal?.classList.remove('flex');
+    if (synergyOpenedFromPause && gameScene.gameState === 'PAUSED') {
+      el.pauseModal?.classList.remove('hidden');
+      el.pauseModal?.classList.add('flex');
+    }
+  });
+
   el.codexBtn?.addEventListener('click', () => {
     audio.unlock();
     audio.playUiClick();
@@ -1433,6 +1716,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.gameHud?.classList.add('hidden');
     el.bossHud?.classList.add('hidden');
     el.hudBuffBar?.classList.add('hidden');
+    el.hudRevivalTag?.classList.add('hidden');
+    el.synergyModal?.classList.add('hidden');
+    el.synergyModal?.classList.remove('flex');
+    el.altarModal?.classList.add('hidden');
+    el.altarModal?.classList.remove('flex');
     el.titleScreen?.classList.remove('hidden');
     gameScene.gameState = 'IDLE';
     gameScene.physics.pause();
@@ -1442,14 +1730,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     renderChallengeSelection();
     renderHeroSelection();
     renderTitleRecords();
+    updateAltarButtonLabel();
     updateCodexButtonLabel();
   };
 
   el.quitBtn?.addEventListener('click', returnToTitle);
   el.endTitleBtn?.addEventListener('click', returnToTitle);
 
-  // Tasto ESC o P per mettere in pausa/chiudere Impostazioni e Spazio/E per Abilità Attiva su desktop
+  // Tasto ESC o P per mettere in pausa/chiudere modali e Spazio/E per Abilità Attiva su desktop
   window.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && el.synergyModal?.classList.contains('flex')) {
+      el.synergyCloseBtn?.click();
+      return;
+    }
+    if (ev.key === 'Escape' && el.altarModal?.classList.contains('flex')) {
+      el.altarCloseBtn?.click();
+      return;
+    }
     if (ev.key === 'Escape' && el.settingsModal?.classList.contains('flex')) {
       closeSettingsModal();
       return;

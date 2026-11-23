@@ -19,6 +19,7 @@ import {
 import { ensureProceduralTextures } from './proceduralTextures.js';
 import { WeaponSystem } from './weaponSystem.js';
 import { BossController } from './bossController.js';
+import { registerCustomWalkFrames, getAnimProfile } from './spriteAnimator.js';
 
 export { UPGRADE_CATALOG, WEAPON_EVOLUTIONS };
 
@@ -102,8 +103,11 @@ export class GameScene extends Phaser.Scene {
 
     // 1. Texture HD moderne (Canvas 2D in browser) + fallback procedurale in ambienti headless
     this.hdMode = typeof document !== 'undefined' && typeof this.textures?.addCanvas === 'function';
+    this.customIllustratedKeys = new Set();
+    this.customWalkFrameCounts = new Map();
     if (this.hdMode) {
       generateHdTextures(this.textures);
+      this._generateAtmosphereTextures();
     }
     ensureProceduralTextures(this.textures, this.make);
     this._loadCustomSpritesFromManifest();
@@ -137,28 +141,47 @@ export class GameScene extends Phaser.Scene {
     this.ground.setScrollFactor(0).setDepth(DEPTH_LAYERS.GROUND);
 
     // 4. Layer grafici dedicati
+    this.groundMarksGfx = this.add.graphics().setDepth(DEPTH_LAYERS.DECALS + 1);
     this.auraGfx = this.add.graphics().setDepth(DEPTH_LAYERS.AURA);
     this.telegraphGfx = this.add.graphics().setDepth(DEPTH_LAYERS.TELEGRAPHS);
     this.vfxGfx = this.add.graphics().setDepth(DEPTH_LAYERS.VFX);
     this.weatherGfx = this.add.graphics().setScrollFactor(0).setDepth(DEPTH_LAYERS.WEATHER);
     this.joystickGfx = this.add.graphics().setScrollFactor(0).setDepth(DEPTH_LAYERS.JOYSTICK);
 
+    this.vignetteOverlay = this.textures.exists('vignette_overlay')
+      ? this.add.image(camW / 2, camH / 2, 'vignette_overlay')
+          .setScrollFactor(0)
+          .setDepth(DEPTH_LAYERS.WEATHER + 5)
+          .setAlpha(0.55)
+      : null;
+
+    this.heroGlow = this.textures.exists('glow_soft')
+      ? this.add.image(0, 0, 'glow_soft')
+          .setDepth(DEPTH_LAYERS.AURA - 5)
+          .setAlpha(0.24)
+          .setScale(1.15)
+      : null;
+    if (this.heroGlow && globalThis.Phaser?.BlendModes?.ADD !== undefined) {
+      this.heroGlow.setBlendMode?.(Phaser.BlendModes.ADD);
+    }
+    this.bossGlow = null;
+
     // 5. Eroe con ombra e hitbox ai piedi
-    this.heroBaseScale = this.hdMode ? 0.347 : 1.30;
+    this.heroBaseScale = this.hdMode ? 0.382 : 1.45;
     this.heroShadow = this.add
       .image(0, 0, 'shadow_ellipse')
       .setDepth(DEPTH_LAYERS.SHADOWS)
       .setAlpha(0.52)
-      .setScale(this.hdMode ? 0.36 : 1.26);
+      .setScale(this.hdMode ? 0.41 : 1.38);
 
     this.hero = this.physics.add.sprite(0, 0, 'hero_warrior');
     this.hero.setScale(this.heroBaseScale);
-    const heroHbW = this.hdMode ? 50 : 18;
-    const heroHbH = this.hdMode ? 38 : 13;
+    const heroHbW = this.hdMode ? 52 : 20;
+    const heroHbH = this.hdMode ? 40 : 14;
     this.hero.body.setSize(heroHbW, heroHbH);
     this.hero.body.setOffset(
       Math.max(0, (this.hero.width - heroHbW) / 2),
-      Math.max(0, this.hero.height - heroHbH - (this.hdMode ? 5 : 1))
+      Math.max(0, this.hero.height - heroHbH - (this.hdMode ? 6 : 1))
     );
 
     this.heroHpBg = this.add
@@ -226,6 +249,7 @@ export class GameScene extends Phaser.Scene {
     this.activeAuraPulses = [];
     this.activeExplosions = [];
     this.activeAstralPillars = [];
+    this.activeGroundMarks = [];
     this.activeSparks = [];
     this._initSparkPool();
     this._initWeatherMotes();
@@ -333,9 +357,12 @@ export class GameScene extends Phaser.Scene {
     this.activeAuraPulses.length = 0;
     this.activeExplosions.length = 0;
     this.activeAstralPillars.length = 0;
+    this.activeGroundMarks.length = 0;
     this.telegraphGfx.clear();
     this.vfxGfx.clear();
     this.auraGfx.clear();
+    this.groundMarksGfx?.clear();
+    if (this.bossGlow) this.bossGlow.setVisible(false);
 
     this.activeHeroId = runConfig.heroId || 'warrior';
     this.activeWeaponId = runConfig.startingWeaponId || 'axe';
@@ -366,6 +393,9 @@ export class GameScene extends Phaser.Scene {
     const chosenTexture = runConfig.textureKey || textureMap[this.activeHeroId] || 'hero_warrior';
     this.heroBaseTexKey = chosenTexture;
     this.heroWalkPhase = 0;
+    this._lastHeroStepIdx = -1;
+    this._heroLeanAngle = 0;
+    this._lastSkillHudSec = 0;
     if (this.textures.exists(chosenTexture)) {
       this.hero.setTexture(chosenTexture);
     }
@@ -375,10 +405,19 @@ export class GameScene extends Phaser.Scene {
     this.hero.clearTint();
     this.hero.setAlpha(1);
     this.hero.setVisible(true);
-    this.hero.setScale(this.heroBaseScale);
-    this.hero.setFlipX(false);
+    this.hero.setFlipX(this._isSpriteNativeFacingLeft(this.heroBaseTexKey));
+    this._refreshHeroSpriteMetrics();
     this.hero.setDepth(computeEntityDepth(0));
-    this.heroShadow.setPosition(0, 21).setVisible(true).setDepth(DEPTH_LAYERS.SHADOWS);
+    this.heroShadow.setPosition(0, 24).setVisible(true).setDepth(DEPTH_LAYERS.SHADOWS);
+    if (this.heroGlow) {
+      const heroAccentMap = {
+        warrior: 0xf59e0b,
+        assassin: 0xe879f9,
+        mage: 0x38bdf8,
+        juggernaut: 0xfb923c
+      };
+      this.heroGlow.setPosition(0, 8).setVisible(true).setTint?.(heroAccentMap[this.activeHeroId] || 0xf59e0b);
+    }
 
     this.elapsedSec = 0;
     this.kills = 0;
@@ -413,7 +452,10 @@ export class GameScene extends Phaser.Scene {
       mightMult: eff.mightMult || 1.0,
       areaMult: eff.areaMult || 1.0,
       magnetMult: eff.magnetMult || 1.0,
-      critChance: eff.critChance || 0.18
+      critChance: eff.critChance || 0.18,
+      xpGainMult: eff.xpGainMult || 1.0,
+      damageReduction: eff.damageReduction || 0,
+      revivals: eff.revivals || 0
     };
 
     this.stats = {
@@ -428,6 +470,9 @@ export class GameScene extends Phaser.Scene {
       areaMult: this.baseRunStats.areaMult,
       magnetRadius: Math.round(84 * this.baseRunStats.magnetMult),
       critChance: this.baseRunStats.critChance,
+      xpGainMult: this.baseRunStats.xpGainMult,
+      damageReduction: this.baseRunStats.damageReduction,
+      revivalsLeft: this.baseRunStats.revivals,
       regenPerSec: 0,
       invulnTimer: 0
     };
@@ -524,6 +569,11 @@ export class GameScene extends Phaser.Scene {
         this.evolvedWeapons[evo.weaponId] = true;
         this.evolutionsForged += 1;
         audio.playEvolution();
+        const evoCol = parseInt((evo.accent || '#fbbf24').replace('#', ''), 16) || 0xfbbf24;
+        this.activeExplosions.push({ x: this.hero.x, y: this.hero.y, maxR: 135, life: 0, dur: 0.42, color: evoCol });
+        this.activeAuraPulses.push({ x: this.hero.x, y: this.hero.y, maxR: 175, life: 0, dur: 0.5, color: 0xfef08a });
+        this._spawnGroundMark('rune', this.hero.x, this.hero.y + 12, 62, evoCol);
+        this._emitSparks(this.hero.x, this.hero.y, 24, evoCol, 200);
         if (evo.weaponId === 'blades') {
           this._rebuildValkyrieBlades();
         }
@@ -637,8 +687,17 @@ export class GameScene extends Phaser.Scene {
     if (this.stats.regenPerSec > 0 && this.stats.hp < this.stats.maxHp) {
       this.stats.hp = Math.min(this.stats.maxHp, this.stats.hp + this.stats.regenPerSec * dt);
     }
+    let skillSecondChanged = false;
     if (this.activeSkillCooldown > 0) {
       this.activeSkillCooldown = Math.max(0, this.activeSkillCooldown - dt);
+      const secCeil = Math.ceil(this.activeSkillCooldown);
+      if (secCeil !== this._lastSkillHudSec) {
+        this._lastSkillHudSec = secCeil;
+        skillSecondChanged = true;
+      }
+    } else if (this._lastSkillHudSec !== 0) {
+      this._lastSkillHudSec = 0;
+      skillSecondChanged = true;
     }
     if (this.activeSkillBuffTimer > 0) {
       this.activeSkillBuffTimer -= dt;
@@ -738,33 +797,153 @@ export class GameScene extends Phaser.Scene {
     this._updateGems(dt);
     this._updatePickups(dt);
     this._updateTelegraphs(dt);
+    this._updateGroundMarks(dt);
     this._updateVfx(dt);
     this._updateDamageTexts(dt);
     this._updateWeather(dt);
+    this._updateAtmosphericGlows();
 
     // 6. Y-Sorting Eroe & Barra HP
     this.hero.setDepth(computeEntityDepth(this.hero.y));
-    this.heroShadow.setPosition(this.hero.x, this.hero.y + 21);
-    this.heroHpBg.setPosition(this.hero.x, this.hero.y + 31);
+    this.heroShadow.setPosition(this.hero.x, this.hero.y + 24);
+    this.heroHpBg.setPosition(this.hero.x, this.hero.y + 35);
     const hpRatio = Phaser.Math.Clamp(this.stats.hp / this.stats.maxHp, 0, 1);
     this.heroHpFill.width = Math.max(0, 38 * hpRatio);
-    this.heroHpFill.setPosition(this.hero.x - 19, this.hero.y + 31);
+    this.heroHpFill.setPosition(this.hero.x - 19, this.hero.y + 35);
     this.heroHpFill.setFillStyle(hpRatio > 0.35 ? 0x22c55e : 0xef4444);
 
-    // 7. HUD sync throttled
+    // 7. HUD sync throttled (o immediato su cambio secondo del cooldown abilità)
     this._hudSyncAcc = (this._hudSyncAcc || 0) + dt;
-    if (this._hudSyncAcc >= 0.1) {
+    if (skillSecondChanged || this._hudSyncAcc >= 0.1) {
       this._hudSyncAcc = 0;
       this._syncHud();
     }
   }
 
-  _applyWalkTextureFrame(sprite, baseKey, phase) {
+  _computeSpriteScale(texKey, targetDisplayH, fallbackScale) {
+    if (this.customIllustratedKeys?.has(texKey)) {
+      const img = this.textures?.get?.(texKey)?.getSourceImage?.();
+      if (img && img.height > 0) {
+        return Number((targetDisplayH / img.height).toFixed(4));
+      }
+    }
+    return fallbackScale;
+  }
+
+  _refreshHeroSpriteMetrics() {
+    if (!this.hero) return;
+    const texKey = this.heroBaseTexKey || 'hero_warrior';
+    const isCustom = Boolean(this.customIllustratedKeys?.has(texKey));
+    this.heroBaseScale = this._computeSpriteScale(texKey, 76, this.hdMode ? 0.382 : 1.45);
+    this.hero.setScale(this.heroBaseScale);
+    if (this.hero.body) {
+      const heroHbW = isCustom ? Math.max(14, Math.round(20 / this.heroBaseScale)) : (this.hdMode ? 52 : 20);
+      const heroHbH = isCustom ? Math.max(11, Math.round(15 / this.heroBaseScale)) : (this.hdMode ? 40 : 14);
+      this.hero.body.setSize(heroHbW, heroHbH);
+      this.hero.body.setOffset(
+        Math.max(0, (this.hero.width - heroHbW) / 2),
+        Math.max(0, this.hero.height - heroHbH - (isCustom ? 10 : this.hdMode ? 6 : 1))
+      );
+    }
+  }
+
+  _refreshBossSpriteMetrics(boss) {
+    if (!boss) return;
+    const texKey = boss.baseTexKey || 'boss';
+    const isCustom = Boolean(this.customIllustratedKeys?.has(texKey));
+    boss.baseScale = this._computeSpriteScale(texKey, 126, this.hdMode ? 0.413 : 1.60);
+    boss.setScale(boss.baseScale);
+    if (boss.body) {
+      const bHbW = isCustom ? Math.max(24, Math.round(52 / boss.baseScale)) : (this.hdMode ? 120 : 48);
+      const bHbH = isCustom ? Math.max(16, Math.round(28 / boss.baseScale)) : (this.hdMode ? 64 : 26);
+      boss.body.setSize(bHbW, bHbH);
+      boss.body.setOffset(
+        Math.max(0, (boss.width - bHbW) / 2),
+        Math.max(0, boss.height - bHbH - (isCustom ? 10 : 5))
+      );
+    }
+  }
+
+  _refreshEnemySpriteMetrics(enemy) {
+    if (!enemy) return;
+    const texKey = enemy.baseTexKey || 'enemy_swarm';
+    const isCustom = Boolean(this.customIllustratedKeys?.has(texKey));
+    const arch = enemy.archetype || 'swarm';
+
+    const specs = {
+      tank: { targetH: 60, fbHd: 0.363, fbLo: 1.34, hdW: 70, hdH: 42, loW: 24, loH: 15 },
+      shieldbearer: { targetH: 58, fbHd: 0.355, fbLo: 1.30, hdW: 64, hdH: 38, loW: 22, loH: 14 },
+      fast: { targetH: 40, fbHd: 0.330, fbLo: 1.19, hdW: 58, hdH: 32, loW: 20, loH: 11 },
+      archer: { targetH: 46, fbHd: 0.322, fbLo: 1.18, hdW: 54, hdH: 32, loW: 18, loH: 11 },
+      shaman: { targetH: 48, fbHd: 0.338, fbLo: 1.24, hdW: 56, hdH: 34, loW: 20, loH: 12 },
+      bomber: { targetH: 46, fbHd: 0.330, fbLo: 1.22, hdW: 56, hdH: 34, loW: 19, loH: 12 },
+      stalker: { targetH: 46, fbHd: 0.332, fbLo: 1.22, hdW: 56, hdH: 34, loW: 19, loH: 12 },
+      berserker: { targetH: 52, fbHd: 0.345, fbLo: 1.28, hdW: 62, hdH: 36, loW: 22, loH: 13 },
+      elite: { targetH: 70, fbHd: 0.385, fbLo: 1.44, hdW: 84, hdH: 48, loW: 30, loH: 18 },
+      swarm: { targetH: 46, fbHd: 0.322, fbLo: 1.19, hdW: 54, hdH: 32, loW: 18, loH: 11 }
+    };
+    const cfg = specs[arch] || specs.swarm;
+    const fallback = this.hdMode ? cfg.fbHd : cfg.fbLo;
+    enemy.baseScale = this._computeSpriteScale(texKey, cfg.targetH, fallback);
+    enemy.setScale(enemy.baseScale);
+
+    if (enemy.body) {
+      const hbW = isCustom ? Math.max(12, Math.round(cfg.loW / enemy.baseScale)) : (this.hdMode ? cfg.hdW : cfg.loW);
+      const hbH = isCustom ? Math.max(10, Math.round(cfg.loH / enemy.baseScale)) : (this.hdMode ? cfg.hdH : cfg.loH);
+      enemy.body.setSize(hbW, hbH);
+      enemy.body.setOffset(
+        Math.max(0, (enemy.width - hbW) / 2),
+        Math.max(0, enemy.height - hbH - (isCustom ? 8 : 3))
+      );
+    }
+  }
+
+  _refreshPropMetrics(prop) {
+    if (!prop) return;
+    const kind = prop.kind || 'prop_tree';
+    const isTree = kind === 'prop_tree' || kind === 'prop_dead_tree' || kind === 'prop_magma_spire' || kind === 'prop_bifrost_pillar';
+    const targetH = kind === 'prop_tree' ? 96 : kind === 'prop_shrine' ? 56 : kind === 'prop_rock' ? 60 : isTree ? 88 : 54;
+    const fallback = this.hdMode ? (isTree ? 0.43 : 0.39) : (isTree ? 1.25 : 1.15);
+    prop.setScale(this._computeSpriteScale(kind, targetH, fallback));
+  }
+
+  _applyWalkTextureFrame(sprite, baseKey, phase, isMoving = true) {
     if (!sprite || !baseKey) return;
-    const fIdx = Math.floor(phase) % 4;
+    const curTexKey = typeof sprite.texture === 'string' ? sprite.texture : sprite.texture?.key;
+    const isCustom = Boolean(this.customIllustratedKeys?.has(baseKey));
+    const customCount = this.customWalkFrameCounts?.get(baseKey) || 0;
+
+    if (isCustom && customCount === 0) {
+      return;
+    }
+
+    if (!isMoving) {
+      const idleKey = isCustom ? baseKey : `${baseKey}_f0`;
+      if (this.textures.exists(idleKey) && curTexKey !== idleKey) {
+        sprite.setTexture(idleKey);
+      }
+      return;
+    }
+
+    const frameCount = isCustom ? customCount : 4;
+    const fIdx = Math.floor(phase) % frameCount;
     const frameKey = `${baseKey}_f${fIdx}`;
-    if (this.textures.exists(frameKey) && sprite.texture !== frameKey) {
+    if (this.textures.exists(frameKey) && curTexKey !== frameKey) {
       sprite.setTexture(frameKey);
+    }
+  }
+
+  _isSpriteNativeFacingLeft(texKey) {
+    if (!texKey || !this.customIllustratedKeys?.has(texKey)) return false;
+    return getAnimProfile(texKey).nativeFacing === 'left';
+  }
+
+  _getRealmDustColor() {
+    switch (this.activeRealmId) {
+      case 'muspelheim': return 0xf97316;
+      case 'helheim': return 0x67e8f9;
+      case 'asgard': return 0xfde047;
+      default: return 0x94a3b8;
     }
   }
 
@@ -796,23 +975,61 @@ export class GameScene extends Phaser.Scene {
     this.hero.setVelocity(vx * speed, vy * speed);
 
     if (Math.abs(vx) > 0.08) {
-      this.hero.setFlipX(vx < 0);
+      const nativeLeft = this._isSpriteNativeFacingLeft(this.heroBaseTexKey);
+      this.hero.setFlipX(nativeLeft ? vx > 0 : vx < 0);
     }
 
-    const baseS = this.heroBaseScale || 1.30;
+    const baseS = this.heroBaseScale || 1.45;
+    const shBase = this.hdMode ? 0.41 : 1.38;
+    const frameCount = this.customWalkFrameCounts?.get(this.heroBaseTexKey) || 4;
+    const animProfile = getAnimProfile(this.heroBaseTexKey);
     const isMoving = Math.abs(vx) > 0.05 || Math.abs(vy) > 0.05;
+
     if (isMoving) {
-      this.heroWalkPhase = (this.heroWalkPhase || 0) + (dt || 0.016) * 10;
-      this._applyWalkTextureFrame(this.hero, this.heroBaseTexKey, this.heroWalkPhase);
-      const bob = Math.sin(this.elapsedSec * 14);
-      this.hero.setScale(baseS * (1 - bob * 0.03), baseS * (1 + bob * 0.04));
-      this.hero.setAngle(bob * 2.5);
+      const cadence = frameCount >= 8 ? 11.8 : 10;
+      const speedRatio = Phaser.Math.Clamp(this.stats?.speedMult || 1, 0.75, 2.0);
+      this.heroWalkPhase = (this.heroWalkPhase || 0) + (dt || 0.016) * cadence * speedRatio;
+      this._applyWalkTextureFrame(this.hero, this.heroBaseTexKey, this.heroWalkPhase, true);
+
+      const cycleTheta = ((this.heroWalkPhase % frameCount) / frameCount) * Math.PI * 2;
+      const strideSin = Math.sin(cycleTheta);
+      const stepLift = Math.abs(strideSin);
+
+      const targetLean = (Math.abs(vx) > 0.08 ? Math.sign(vx) * 2.6 : 0) + strideSin * (animProfile.mode === 'hover' ? 1.8 : 2.3);
+      this._heroLeanAngle = (this._heroLeanAngle || 0) + (targetLean - (this._heroLeanAngle || 0)) * Math.min(1, (dt || 0.016) * 14);
+
+      this.hero.setScale(baseS * (1 - stepLift * 0.025), baseS * (1 + stepLift * 0.032));
+      this.hero.setAngle(this._heroLeanAngle);
+
+      if (this.heroShadow) {
+        this.heroShadow.setScale(shBase * (1 - stepLift * 0.14), shBase * (1 - stepLift * 0.10));
+        this.heroShadow.setAlpha(0.52 - stepLift * 0.12);
+      }
+
+      const stepIdx = Math.floor(this.heroWalkPhase / (frameCount / 2));
+      if (stepIdx !== this._lastHeroStepIdx) {
+        this._lastHeroStepIdx = stepIdx;
+        if (this.settings?.vfxQuality !== 'reduced') {
+          const footOffX = strideSin >= 0 ? -6 : 6;
+          this._emitSparks(this.hero.x + footOffX, this.hero.y + 26, 2, this._getRealmDustColor(), 38);
+        }
+      }
     } else {
       this.heroWalkPhase = 0;
-      this._applyWalkTextureFrame(this.hero, this.heroBaseTexKey, 0);
-      const idle = Math.sin(this.elapsedSec * 3.5);
-      this.hero.setScale(baseS, baseS * (1 + idle * 0.02));
-      this.hero.setAngle(0);
+      this._lastHeroStepIdx = -1;
+      this._applyWalkTextureFrame(this.hero, this.heroBaseTexKey, 0, false);
+
+      const breath = Math.sin(this.elapsedSec * 3.4);
+      this._heroLeanAngle = (this._heroLeanAngle || 0) * 0.84;
+      const breathY = animProfile.mode === 'hover' ? breath * 0.030 : breath * 0.022;
+      this.hero.setScale(baseS * (1 - breath * 0.012), baseS * (1 + breathY));
+      this.hero.setAngle(this._heroLeanAngle);
+
+      if (this.heroShadow) {
+        const hoverScale = animProfile.mode === 'hover' ? 1 - breath * 0.08 : 1;
+        this.heroShadow.setScale(shBase * hoverScale, shBase * hoverScale);
+        this.heroShadow.setAlpha(0.52);
+      }
     }
 
     this.joystickGfx.clear();
@@ -1112,6 +1329,7 @@ export class GameScene extends Phaser.Scene {
     enemy.flashTimer = 0;
     enemy.bladeCooldown = 0;
     enemy.walkPhase = Math.random() * 4;
+    this._refreshEnemySpriteMetrics(enemy);
     enemy.setDepth(computeEntityDepth(sy));
 
     this.encounteredEnemies?.add(archetype);
@@ -1170,11 +1388,7 @@ export class GameScene extends Phaser.Scene {
     elite.freezeTimer = 0;
     elite.walkPhase = 0;
     elite.setDepth(computeEntityDepth(by));
-
-    const hbW = this.hdMode ? 84 : 30;
-    const hbH = this.hdMode ? 48 : 18;
-    elite.body.setSize(hbW, hbH);
-    elite.body.setOffset(Math.max(0, (elite.width - hbW) / 2), Math.max(0, elite.height - hbH - 4));
+    this._refreshEnemySpriteMetrics(elite);
 
     if (!elite.shadow) {
       elite.shadow = this.add.image(bx, by + 28, 'shadow_ellipse').setDepth(DEPTH_LAYERS.SHADOWS).setAlpha(0.5);
@@ -1244,8 +1458,6 @@ export class GameScene extends Phaser.Scene {
     boss.setTexture(bossTex);
     boss.baseTexKey = bossTex;
     boss.enableBody(true, bx, by, true, true);
-    boss.baseScale = this.hdMode ? 0.413 : 1.60;
-    boss.setScale(boss.baseScale);
     boss.clearTint();
     boss.setAlpha(1);
     boss.setVisible(true);
@@ -1270,11 +1482,7 @@ export class GameScene extends Phaser.Scene {
     boss.freezeTimer = 0;
     boss.walkPhase = 0;
     boss.setDepth(computeEntityDepth(by));
-
-    const bHbW = this.hdMode ? 120 : 48;
-    const bHbH = this.hdMode ? 64 : 26;
-    boss.body.setSize(bHbW, bHbH);
-    boss.body.setOffset(Math.max(0, (boss.width - bHbW) / 2), Math.max(0, boss.height - bHbH - 5));
+    this._refreshBossSpriteMetrics(boss);
 
     if (!boss.shadow) {
       boss.shadow = this.add.image(bx, by + 37, 'shadow_ellipse').setDepth(DEPTH_LAYERS.SHADOWS).setAlpha(0.54);
@@ -1291,6 +1499,16 @@ export class GameScene extends Phaser.Scene {
     this.bossHalfHpTriggered = false;
     this.bossTransformed = false;
     this.bossAttackStep = 0;
+    if (this.textures.exists('glow_soft')) {
+      if (!this.bossGlow) {
+        this.bossGlow = this.add.image(bx, by + 16, 'glow_soft').setDepth(DEPTH_LAYERS.AURA - 4).setScale(1.85).setAlpha(0.32);
+        if (globalThis.Phaser?.BlendModes?.ADD !== undefined) {
+          this.bossGlow.setBlendMode?.(Phaser.BlendModes.ADD);
+        }
+      }
+      const bossGlowCol = realm.boss?.telegraphColor || 0xf87171;
+      this.bossGlow.setPosition(bx, by + 16).setVisible(true).setTint?.(bossGlowCol);
+    }
     swapPopPush(this.activeEnemies, boss, '_poolIdx');
     this.bridge?.onBossHudUpdate?.(this.bossController.getHudPayload(boss));
   }
@@ -1371,6 +1589,7 @@ export class GameScene extends Phaser.Scene {
     this.kills += 1;
     if (wasBomber) {
       enemy.bomberTriggered = true;
+      this._spawnGroundMark('scorch', ex, ey, 54, 0xf97316);
       this.activeTelegraphs.push({
         x: ex,
         y: ey,
@@ -1401,6 +1620,7 @@ export class GameScene extends Phaser.Scene {
   async _onBossDefeated(ex = this.hero.x, ey = this.hero.y) {
     this.bossesDefeatedCount = (this.bossesDefeatedCount || 0) + 1;
     this.bossSprite = null;
+    if (this.bossGlow) this.bossGlow.setVisible(false);
     this.activeTelegraphs.length = 0;
     this.telegraphGfx.clear();
 
@@ -1467,7 +1687,8 @@ export class GameScene extends Phaser.Scene {
 
     const shieldMult = this.activeBuff?.id === 'frost_shield' ? 0.55 : 1;
     const ironMult = this.ironSkinTimer > 0 ? 0.25 : 1;
-    const dmg = Math.max(1, Math.round((enemy.damage || 10) * shieldMult * ironMult));
+    const wardMult = Math.max(0.25, 1 - (this.stats.damageReduction || 0));
+    const dmg = Math.max(1, Math.round((enemy.damage || 10) * shieldMult * ironMult * wardMult));
     this.stats.hp = Math.max(0, this.stats.hp - dmg);
     this.stats.invulnTimer = 0.48;
     audio.playPlayerHurt();
@@ -1480,8 +1701,45 @@ export class GameScene extends Phaser.Scene {
     });
 
     if (this.stats.hp <= 0) {
+      if ((this.stats.revivalsLeft || 0) > 0) {
+        this._triggerAltarRevival();
+        return;
+      }
       this._triggerGameOver();
     }
+  }
+
+  _triggerAltarRevival() {
+    this.stats.revivalsLeft = Math.max(0, (this.stats.revivalsLeft || 1) - 1);
+    this.stats.hp = Math.max(1, Math.round(this.stats.maxHp * 0.5));
+    this.stats.invulnTimer = 2.6;
+    audio.playRevival();
+    triggerHaptic([35, 40, 50], this.settings);
+    this._shake(220, 0.01);
+    this.hero.clearTint();
+    this._emitSparks(this.hero.x, this.hero.y, 26, 0xfbbf24, 220);
+    this.activeExplosions.push({ x: this.hero.x, y: this.hero.y, maxR: 210, life: 0, dur: 0.48, color: 0xfbbf24 });
+
+    for (const e of this.activeEnemies) {
+      if (!e.active || e.isBoss) continue;
+      const dx = e.x - this.hero.x;
+      const dy = e.y - this.hero.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < 220 * 220) {
+        const dist = Math.sqrt(dSq) || 1;
+        e.knockbackTimer = 0.3;
+        e.setVelocity((dx / dist) * 290, (dy / dist) * 290);
+      }
+    }
+
+    this.bridge?.onDialogue?.({
+      triggerKey: 'altar_revival',
+      speaker: 'Fiamma del Valhalla',
+      role: 'Altare delle Rune',
+      text: 'Le rune eterne ti rialzano dalla polvere! (+50% HP)',
+      accent: '#fbbf24'
+    });
+    this._syncHud();
   }
 
   async _triggerGameOver() {
@@ -1649,9 +1907,11 @@ export class GameScene extends Phaser.Scene {
         e.setFlipX(dx < 0);
       }
 
-      e.walkPhase += dt * (e.isBoss ? 5.5 : 8.5);
+      const eFrameCount = e.baseTexKey ? (this.customWalkFrameCounts?.get(e.baseTexKey) || 4) : 4;
+      const walkCadence = e.isBoss ? (eFrameCount >= 8 ? 7.8 : 5.5) : 8.5;
+      e.walkPhase += dt * walkCadence;
       if (e.baseTexKey) {
-        this._applyWalkTextureFrame(e, e.baseTexKey, e.walkPhase);
+        this._applyWalkTextureFrame(e, e.baseTexKey, e.walkPhase, true);
       }
       const baseScale =
         e.baseScale ||
@@ -1660,12 +1920,25 @@ export class GameScene extends Phaser.Scene {
           : (e.archetype === 'tank' || e.archetype === 'shieldbearer')
             ? this.hdMode ? 0.363 : 1.34
             : this.hdMode ? 0.322 : 1.19);
-      const wobble = Math.sin(e.walkPhase * 1.4);
-      e.setScale(baseScale * (1 - wobble * 0.03), baseScale * (1 + wobble * 0.04));
+      const cycleTheta = e.isBoss && eFrameCount >= 8
+        ? ((e.walkPhase % eFrameCount) / eFrameCount) * Math.PI * 2
+        : e.walkPhase * 1.4;
+      const wobble = Math.sin(cycleTheta);
+      e.setScale(baseScale * (1 - Math.abs(wobble) * 0.025), baseScale * (1 + Math.abs(wobble) * 0.035));
+      if (e.isBoss) {
+        e.setAngle(wobble * 1.9);
+      }
 
       e.setDepth(computeEntityDepth(e.y));
       if (e.shadow) {
         e.shadow.setPosition(e.x, e.y + (e.isBoss ? 37 : e.isMiniBoss ? 28 : (e.archetype === 'tank' || e.archetype === 'shieldbearer') ? 23 : 15));
+        if (e.isBoss) {
+          const bossLift = Math.abs(wobble);
+          const shBaseX = this.hdMode ? 0.73 : 2.97;
+          const shBaseY = this.hdMode ? 0.48 : 1.87;
+          e.shadow.setScale(shBaseX * (1 - bossLift * 0.12), shBaseY * (1 - bossLift * 0.09));
+          e.shadow.setAlpha(0.54 - bossLift * 0.10);
+        }
       }
     }
 
@@ -1705,6 +1978,8 @@ export class GameScene extends Phaser.Scene {
     audio.playBossAttack();
     this._shake(160, 0.0075);
     this._emitSparks(t.x, t.y, 16, col, 180);
+    const markKind = col === 0xa855f7 || col === 0x34d399 || col === 0xfbbf24 ? 'rune' : col === 0xfb923c ? 'scorch' : 'fissure';
+    this._spawnGroundMark(markKind, t.x, t.y, Math.max(36, t.radius * 0.78), col);
 
     const ring = this.add
       .circle(t.x, t.y, t.radius, col, 0.48)
@@ -1805,8 +2080,19 @@ export class GameScene extends Phaser.Scene {
 
       if (this._damageCratesInRadius(p.x, p.y, 26) && p.kind === 'orb') {
         this.activeExplosions.push({ x: p.x, y: p.y, maxR: p.blastRadius || 48, life: 0, dur: 0.25, color: 0x38bdf8 });
+        this._spawnGroundMark('scorch', p.x, p.y, (p.blastRadius || 48) * 0.72, 0x38bdf8);
         this._recycleProjectile(p);
         continue;
+      }
+
+      if (this.settings?.vfxQuality !== 'reduced') {
+        if (!p.trail) p.trail = [];
+        p.ribbonTimer = (p.ribbonTimer || 0) - dt;
+        if (p.ribbonTimer <= 0) {
+          p.ribbonTimer = 0.018;
+          p.trail.push({ x: p.x, y: p.y });
+          if (p.trail.length > 6) p.trail.shift();
+        }
       }
 
       p.trailTimer -= dt;
@@ -1824,6 +2110,39 @@ export class GameScene extends Phaser.Scene {
 
   _updateVfx(dt) {
     this.vfxGfx.clear();
+
+    // Scie luminose affusolate dietro ai proiettili attivi
+    if (this.settings?.vfxQuality !== 'reduced') {
+      for (let i = 0; i < this.activeProjectiles.length; i++) {
+        const p = this.activeProjectiles[i];
+        if (!p.active || !p.trail || p.trail.length === 0) continue;
+        const trailCol = p.evolved
+          ? 0xfde047
+          : p.kind === 'dagger'
+            ? 0xe879f9
+            : p.kind === 'orb'
+              ? 0x38bdf8
+              : p.kind === 'scythe'
+                ? 0xc084fc
+                : p.kind === 'spear'
+                  ? 0x7dd3fc
+                  : p.kind === 'fangs'
+                    ? 0xd8b4fe
+                    : 0xfbbf24;
+        const len = p.trail.length;
+        for (let k = 0; k < len; k++) {
+          const ptA = p.trail[k];
+          const ptB = k + 1 < len ? p.trail[k + 1] : p;
+          const frac = (k + 1) / (len + 1);
+          const width = (p.kind === 'orb' ? 6.5 : p.kind === 'axe' || p.kind === 'scythe' ? 4.8 : 3.4) * frac;
+          this.vfxGfx.lineStyle(width, trailCol, frac * 0.52);
+          this.vfxGfx.beginPath();
+          this.vfxGfx.moveTo(ptA.x, ptA.y);
+          this.vfxGfx.lineTo(ptB.x, ptB.y);
+          this.vfxGfx.strokePath();
+        }
+      }
+    }
 
     for (let i = this.activeAuraPulses.length - 1; i >= 0; i--) {
       const p = this.activeAuraPulses[i];
@@ -1971,10 +2290,139 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  _generateAtmosphereTextures() {
+    if (!this.textures || typeof document === 'undefined') return;
+    if (!this.textures.exists('glow_soft')) {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 128;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(64, 64, 2, 64, 64, 62);
+      grad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      grad.addColorStop(0.35, 'rgba(255,255,255,0.42)');
+      grad.addColorStop(0.75, 'rgba(255,255,255,0.10)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      this.textures.addCanvas('glow_soft', c);
+    }
+    if (!this.textures.exists('vignette_overlay')) {
+      const w = 450;
+      const h = 800;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createRadialGradient(w * 0.5, h * 0.48, w * 0.34, w * 0.5, h * 0.5, h * 0.64);
+      grad.addColorStop(0, 'rgba(2, 6, 16, 0)');
+      grad.addColorStop(0.62, 'rgba(2, 6, 16, 0.14)');
+      grad.addColorStop(1, 'rgba(2, 6, 16, 0.64)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      this.textures.addCanvas('vignette_overlay', c);
+    }
+  }
+
+  _spawnGroundMark(kind, x, y, radius = 44, color = 0xfbbf24) {
+    if (!this.activeGroundMarks) this.activeGroundMarks = [];
+    if (this.activeGroundMarks.length >= 26) {
+      this.activeGroundMarks.shift();
+    }
+    this.activeGroundMarks.push({
+      kind: kind || 'fissure',
+      x,
+      y,
+      radius,
+      color,
+      life: 0,
+      dur: kind === 'rune' ? 2.6 : 2.2,
+      seed: Math.random() * Math.PI * 2
+    });
+  }
+
+  _updateGroundMarks(dt) {
+    if (!this.groundMarksGfx) return;
+    this.groundMarksGfx.clear();
+    if (!this.activeGroundMarks || this.activeGroundMarks.length === 0) return;
+
+    for (let i = this.activeGroundMarks.length - 1; i >= 0; i--) {
+      const m = this.activeGroundMarks[i];
+      m.life += dt;
+      const t = m.life / m.dur;
+      if (t >= 1) {
+        this.activeGroundMarks.splice(i, 1);
+        continue;
+      }
+      const fade = Math.pow(1 - t, 1.35);
+
+      if (m.kind === 'scorch') {
+        this.groundMarksGfx.fillStyle(0x090d16, 0.42 * fade);
+        this.groundMarksGfx.fillCircle(m.x, m.y, m.radius * 0.68);
+        this.groundMarksGfx.lineStyle(2.2, m.color, 0.48 * fade);
+        this.groundMarksGfx.strokeCircle(m.x, m.y, m.radius * 0.78);
+      } else if (m.kind === 'rune') {
+        this.groundMarksGfx.lineStyle(2, m.color, 0.56 * fade);
+        this.groundMarksGfx.strokeCircle(m.x, m.y, m.radius * 0.76);
+        this.groundMarksGfx.beginPath();
+        for (let r = 0; r < 6; r++) {
+          const ang = m.seed + (r * Math.PI * 2) / 6;
+          this.groundMarksGfx.moveTo(m.x + Math.cos(ang) * m.radius * 0.2, m.y + Math.sin(ang) * m.radius * 0.2);
+          this.groundMarksGfx.lineTo(m.x + Math.cos(ang) * m.radius * 0.75, m.y + Math.sin(ang) * m.radius * 0.75);
+        }
+        this.groundMarksGfx.strokePath();
+      } else {
+        // Fessure radiali nel terreno (Martello / Flagello / Schianti)
+        this.groundMarksGfx.fillStyle(0x090d16, 0.34 * fade);
+        this.groundMarksGfx.fillCircle(m.x, m.y, m.radius * 0.34);
+        this.groundMarksGfx.lineStyle(2.4, 0x090d16, 0.65 * fade);
+        this.groundMarksGfx.beginPath();
+        for (let f = 0; f < 6; f++) {
+          const ang = m.seed + (f * Math.PI * 2) / 6;
+          const midR = m.radius * 0.45;
+          const endR = m.radius * 0.88;
+          this.groundMarksGfx.moveTo(m.x, m.y);
+          this.groundMarksGfx.lineTo(m.x + Math.cos(ang + 0.12) * midR, m.y + Math.sin(ang + 0.12) * midR);
+          this.groundMarksGfx.lineTo(m.x + Math.cos(ang - 0.08) * endR, m.y + Math.sin(ang - 0.08) * endR);
+        }
+        this.groundMarksGfx.strokePath();
+        this.groundMarksGfx.lineStyle(1.4, m.color, 0.42 * fade);
+        this.groundMarksGfx.strokeCircle(m.x, m.y, m.radius * 0.42);
+      }
+    }
+  }
+
+  _updateAtmosphericGlows() {
+    if (this.heroGlow && this.hero) {
+      const hasBuff = (this.activeSkillBuffTimer || 0) > 0 || (this.ironSkinTimer || 0) > 0 || Boolean(this.activeBuff);
+      const pulse = 1 + Math.sin(this.elapsedSec * (hasBuff ? 7 : 3.2)) * 0.12;
+      this.heroGlow.setPosition(this.hero.x, this.hero.y + 8);
+      this.heroGlow.setScale((hasBuff ? 1.48 : 1.12) * pulse);
+      this.heroGlow.setAlpha(hasBuff ? 0.38 : 0.22);
+    }
+    if (this.bossGlow) {
+      if (this.bossSprite && this.bossSprite.active) {
+        const pulse = 1 + Math.sin(this.elapsedSec * 4.2) * 0.1;
+        this.bossGlow.setPosition(this.bossSprite.x, this.bossSprite.y + 16);
+        this.bossGlow.setScale((this.bossSprite.isTransformed ? 2.15 : 1.85) * pulse);
+        this.bossGlow.setVisible(true);
+      } else {
+        this.bossGlow.setVisible(false);
+      }
+    }
+    if (this.propItems) {
+      for (let i = 0; i < this.propItems.length; i++) {
+        const glow = this.propItems[i].glow;
+        if (!glow || !glow.visible) continue;
+        const flicker = 0.92 + Math.sin(this.elapsedSec * 6.5 + i * 1.7) * 0.08;
+        glow.setAlpha((glow.baseAlpha || 0.26) * flicker);
+      }
+    }
+  }
+
   _initWeatherMotes() {
     const w = this.scale.width;
     const h = this.scale.height;
-    this.weatherMotes = Array.from({ length: 28 }, (_, i) => ({
+    this.weatherMotes = Array.from({ length: 30 }, (_, i) => ({
       x: Math.random() * w,
       y: Math.random() * h,
       vx: -10 - Math.random() * 14,
@@ -2085,7 +2533,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   _grantXp(amount) {
-    this.stats.xp += amount;
+    const scaled = Math.max(1, Math.round(amount * (this.stats.xpGainMult || 1)));
+    this.stats.xp += scaled;
     if (this.stats.xp >= this.stats.xpNeeded) {
       this.stats.xp -= this.stats.xpNeeded;
       this.stats.level += 1;
@@ -2180,9 +2629,11 @@ export class GameScene extends Phaser.Scene {
       this.crateItems.push(crate);
     }
     for (let i = 0; i < 2; i++) {
-      const shrine = this.add.image(0, 0, 'prop_shrine').setScale(this.hdMode ? 0.43 : 1.1);
+      const shrine = this.add.image(0, 0, 'prop_shrine');
+      shrine.kind = 'prop_shrine';
       shrine.charge = 0;
       shrine.cooldown = 0;
+      this._refreshPropMetrics(shrine);
       this.shrineItems.push(shrine);
     }
     for (let i = 0; i < 12; i++) {
@@ -2386,6 +2837,11 @@ export class GameScene extends Phaser.Scene {
       this.evolvedWeapons[evo.weaponId] = true;
       this.evolutionsForged += 1;
       audio.playEvolution();
+      const evoCol = parseInt((evo.accent || '#fbbf24').replace('#', ''), 16) || 0xfbbf24;
+      this.activeExplosions.push({ x: this.hero.x, y: this.hero.y, maxR: 135, life: 0, dur: 0.42, color: evoCol });
+      this.activeAuraPulses.push({ x: this.hero.x, y: this.hero.y, maxR: 175, life: 0, dur: 0.5, color: 0xfef08a });
+      this._spawnGroundMark('rune', this.hero.x, this.hero.y + 12, 62, evoCol);
+      this._emitSparks(this.hero.x, this.hero.y, 24, evoCol, 200);
       if (evo.weaponId === 'blades') {
         this._rebuildValkyrieBlades();
       }
@@ -2448,6 +2904,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   _recycleProjectile(proj) {
+    if (proj.trail) proj.trail.length = 0;
     proj.disableBody(true, true);
     swapPopRemove(this.activeProjectiles, proj, '_poolIdx');
   }
@@ -2541,6 +2998,16 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  _setPropGlowVisual(glow, color, alpha) {
+    if (!glow) return;
+    if (glow.isSoftGlow) {
+      glow.setTint?.(color);
+      glow.setAlpha(alpha);
+    } else {
+      glow.setFillStyle?.(color, alpha);
+    }
+  }
+
   _applyRealmToDecalsAndProps() {
     const realm = this.activeRealm || getRealmConfig('midgard');
     const decals = realm.decalKeys || ['decal_rune', 'decal_relic', 'decal_snow'];
@@ -2559,33 +3026,39 @@ export class GameScene extends Phaser.Scene {
       if (this.textures.exists(kind)) {
         prop.setTexture(kind);
       }
-      const isTree = kind === 'prop_tree' || kind === 'prop_dead_tree' || kind === 'prop_magma_spire' || kind === 'prop_bifrost_pillar';
-      const pScale = this.hdMode
-        ? isTree ? 0.43 : 0.39
-        : isTree ? 1.25 : 1.15;
-      prop.setScale(pScale);
+      this._refreshPropMetrics(prop);
       if (prop.glow) {
         const hasGlow = kind === 'prop_brazier' || kind === 'prop_soul_brazier' || kind === 'prop_magma_spire' || kind === 'prop_asgard_brazier';
         prop.glow.setVisible(hasGlow);
-        if (kind === 'prop_soul_brazier') prop.glow.setFillStyle(0x10b981, 0.16);
-        else if (kind === 'prop_asgard_brazier') prop.glow.setFillStyle(0xfbbf24, 0.18);
-        else prop.glow.setFillStyle(0xf97316, 0.16);
+        if (kind === 'prop_soul_brazier') this._setPropGlowVisual(prop.glow, 0x10b981, 0.22);
+        else if (kind === 'prop_asgard_brazier') this._setPropGlowVisual(prop.glow, 0xfbbf24, 0.24);
+        else this._setPropGlowVisual(prop.glow, 0xf97316, 0.22);
       }
     }
   }
 
   _initScenicProps() {
+    const useSoftGlow = this.textures.exists('glow_soft');
     for (let i = 0; i < GAME_CONFIG.PROP_COUNT; i++) {
       const mod = i % 5;
       const kind = mod === 0 ? 'prop_brazier' : mod === 1 ? 'prop_rock' : 'prop_tree';
       const prop = this.propsGroup.create(0, 0, kind);
-      const pScale = this.hdMode
-        ? kind === 'prop_tree' ? 0.43 : 0.39
-        : kind === 'prop_tree' ? 1.25 : 1.15;
-      prop.setScale(pScale);
       prop.kind = kind;
+      this._refreshPropMetrics(prop);
       if (mod === 0 || mod === 2) {
-        prop.glow = this.add.circle(0, 0, 34, 0xf97316, 0.15).setDepth(DEPTH_LAYERS.DECALS + 1);
+        if (useSoftGlow) {
+          prop.glow = this.add.image(0, 0, 'glow_soft')
+            .setDepth(DEPTH_LAYERS.DECALS + 1)
+            .setScale(0.95)
+            .setAlpha(0.22);
+          prop.glow.isSoftGlow = true;
+          prop.glow.setTint?.(0xf97316);
+          if (globalThis.Phaser?.BlendModes?.ADD !== undefined) {
+            prop.glow.setBlendMode?.(Phaser.BlendModes.ADD);
+          }
+        } else {
+          prop.glow = this.add.circle(0, 0, 34, 0xf97316, 0.15).setDepth(DEPTH_LAYERS.DECALS + 1);
+        }
         if (mod !== 0) prop.glow.setVisible(false);
       }
       this.propItems.push(prop);
@@ -2729,6 +3202,7 @@ export class GameScene extends Phaser.Scene {
       runMode: this.runMode || 'campaign',
       endlessWave: this.endlessWave || 0,
       bossSpawned: Boolean(this.bossSprite && this.bossSprite.active) || (this.runMode === 'campaign' && this.bossSpawned),
+      revivalsLeft: this.stats.revivalsLeft || 0,
       buff: this.activeBuff ? { ...this.activeBuff } : null,
       activeSkill: heroSkill ? {
         ...heroSkill,
@@ -2750,24 +3224,112 @@ export class GameScene extends Phaser.Scene {
       const enabled = Array.isArray(manifest?.enabled) ? manifest.enabled : [];
       if (enabled.length === 0) return;
 
-      let queued = false;
-      for (const key of enabled) {
-        const url = `./assets/sprites/${key}.png`;
-        const probe = await fetch(url, { method: 'GET' });
-        const contentType = probe.headers.get('content-type') || '';
-        if (probe.ok && contentType.startsWith('image/')) {
-          if (this.textures.exists(key)) {
-            this.textures.remove(key);
+      const probes = await Promise.all(
+        enabled.map(async (key) => {
+          const url = `./assets/sprites/${key}.png`;
+          try {
+            const probe = await fetch(url, { method: 'GET' });
+            const contentType = probe.headers.get('content-type') || '';
+            if (probe.ok && contentType.startsWith('image/')) {
+              return { key, url };
+            }
+          } catch {
+            // Ignora asset singolo non raggiungibile
           }
-          this.load.image(key, url);
-          queued = true;
+          return null;
+        })
+      );
+
+      if (!this.textures || !this.load || this.sys?.isDestroyed) return;
+
+      const queued = [];
+      for (const entry of probes) {
+        if (!entry) continue;
+        const tempKey = `__custom_${entry.key}`;
+        if (this.textures.exists(tempKey)) {
+          this.textures.remove(tempKey);
         }
+        this.load.image(tempKey, entry.url);
+        queued.push({ key: entry.key, tempKey });
       }
 
-      if (queued) {
+      if (queued.length > 0) {
         this.load.once('complete', () => {
-          if (this.hero && this.textures.exists('hero_warrior')) this.hero.setTexture('hero_warrior');
-          if (this.ground && this.textures.exists('ground_tile')) this.ground.setTexture('ground_tile');
+          if (!this.textures || this.sys?.isDestroyed) return;
+
+          const swappedKeys = new Set();
+          for (const { key, tempKey } of queued) {
+            if (!this.textures.exists(tempKey)) continue;
+            const srcImg = this.textures.get(tempKey)?.getSourceImage?.();
+            const imgW = srcImg?.naturalWidth || srcImg?.width || 0;
+            const imgH = srcImg?.naturalHeight || srcImg?.height || 0;
+
+            if (srcImg && imgW > 0 && imgH > 0) {
+              this.textures.remove(tempKey);
+              if (this.textures.exists(key)) {
+                this.textures.remove(key);
+              }
+              this.textures.addImage(key, srcImg);
+              this.customIllustratedKeys.add(key);
+              const count = registerCustomWalkFrames(this.textures, key, srcImg);
+              if (count > 0) {
+                this.customWalkFrameCounts.set(key, count);
+              }
+              swappedKeys.add(key);
+            } else {
+              this.textures.remove(tempKey);
+            }
+          }
+
+          if (swappedKeys.size === 0) return;
+
+          const activeHeroTex = this.heroBaseTexKey || 'hero_warrior';
+          if (this.hero && this.textures.exists(activeHeroTex)) {
+            this.hero.setTexture(activeHeroTex);
+            this.hero.setFlipX(this._isSpriteNativeFacingLeft(activeHeroTex));
+            this._refreshHeroSpriteMetrics();
+          }
+          if (this.bossSprite && this.bossSprite.active && this.bossSprite.baseTexKey && this.textures.exists(this.bossSprite.baseTexKey)) {
+            this.bossSprite.setTexture(this.bossSprite.baseTexKey);
+            this._refreshBossSpriteMetrics(this.bossSprite);
+          }
+          if (this.ground && swappedKeys.has('ground_tile') && this.textures.exists('ground_tile')) {
+            this.ground.setTexture('ground_tile');
+          }
+          for (const enemy of this.enemyPool?.getChildren?.() || this.activeEnemies || []) {
+            if (!enemy) continue;
+            const targetKey = enemy.baseTexKey || enemy.texture?.key?.replace(/_f\d+$/, '');
+            if (targetKey && swappedKeys.has(targetKey) && this.textures.exists(targetKey)) {
+              enemy.setTexture(targetKey);
+              if (enemy.active) {
+                if (enemy.isBoss) {
+                  this._refreshBossSpriteMetrics(enemy);
+                } else {
+                  this._refreshEnemySpriteMetrics(enemy);
+                }
+              }
+            }
+          }
+          for (const prop of this.propItems || []) {
+            if (prop?.kind && swappedKeys.has(prop.kind) && this.textures.exists(prop.kind)) {
+              prop.setTexture(prop.kind);
+              this._refreshPropMetrics(prop);
+            }
+          }
+          for (const shrine of this.shrineItems || []) {
+            if (shrine && swappedKeys.has('prop_shrine') && this.textures.exists('prop_shrine')) {
+              shrine.setTexture('prop_shrine');
+              this._refreshPropMetrics(shrine);
+            }
+          }
+          for (const child of this.children?.list || []) {
+            const curKey = typeof child?.texture === 'string' ? child.texture : child?.texture?.key;
+            if (!curKey) continue;
+            const baseKey = swappedKeys.has(curKey) ? curKey : curKey.replace(/_f\d+$/, '');
+            if (swappedKeys.has(baseKey) && child.texture?.manager === null && this.textures.exists(baseKey)) {
+              child.setTexture(baseKey);
+            }
+          }
         });
         this.load.start();
       }

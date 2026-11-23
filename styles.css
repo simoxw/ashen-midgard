@@ -228,6 +228,20 @@ body {
   backdrop-filter: blur(4px);
 }
 
+.hud-revival-tag {
+  position: absolute;
+  top: 62px;
+  right: 12px;
+  background: rgba(120, 53, 15, 0.72);
+  border: 1px solid rgba(251, 191, 36, 0.7);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-family: 'Silkscreen', monospace;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  color: #fef3c7;
+}
+
 /* Pulsante Abilità Attiva Eroe (Thumb Zone in basso a destra) */
 #active-skill-btn {
   pointer-events: auto;
@@ -310,6 +324,18 @@ body {
   font-variant-numeric: tabular-nums;
   color: #f8fafc;
   z-index: 1;
+}
+
+#active-skill-btn.is-cooldown .skill-btn-icon {
+  opacity: 0.32;
+}
+
+#active-skill-btn.is-cooldown .skill-btn-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fde68a;
+  margin-top: 1px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
 }
 
 /* Dialogo breve in partita */
@@ -505,6 +531,13 @@ body {
   padding: 18px;
   background: rgba(5, 8, 15, 0.84);
   backdrop-filter: blur(6px);
+}
+
+#synergy-modal,
+#settings-modal,
+#codex-modal,
+#altar-modal {
+  z-index: 65;
 }
 
 .modal-panel {
@@ -804,15 +837,31 @@ body {
 }
 
 .hero-avatar {
-  width: 38px;
-  height: 38px;
+  width: 56px;
+  height: 56px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: rgba(9, 13, 22, 0.85);
+  background: radial-gradient(circle at 50% 35%, rgba(30, 41, 59, 0.92) 0%, rgba(9, 13, 22, 0.96) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
+  padding: 3px;
+  overflow: hidden;
+}
+
+.hero-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.hero-avatar-fallback {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .hero-card-name {
@@ -1565,6 +1614,252 @@ body {
   margin: 2px 0 0;
   font-size: 12px;
   line-height: 1.45;
+  color: #cbd5e1;
+}
+
+/* Altare delle Rune & Braci Runiche */
+.btn-altar-ready {
+  border-color: rgba(251, 191, 36, 0.75);
+  color: #fef3c7;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.18) inset;
+}
+
+.altar-balance-badge {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(251, 191, 36, 0.65);
+  background: rgba(120, 53, 15, 0.48);
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #fde68a;
+  white-space: nowrap;
+}
+
+.altar-summary-bar {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.72);
+  font-size: 11px;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+
+.altar-rune-card {
+  background: rgba(30, 41, 59, 0.68);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--rune-accent, var(--gold));
+  border-radius: 10px;
+  padding: 10px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.altar-rune-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.altar-rune-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.altar-rune-name {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.altar-rune-tag {
+  font-family: 'Silkscreen', monospace;
+  font-size: 9px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  background: rgba(9, 13, 22, 0.72);
+}
+
+.altar-rune-desc {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #cbd5e1;
+}
+
+.altar-rune-pips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.altar-pip {
+  width: 14px;
+  height: 5px;
+  border-radius: 2px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.altar-pip.is-filled {
+  background: var(--rune-accent, var(--gold));
+  border-color: transparent;
+}
+
+.altar-rank-text {
+  font-family: 'Silkscreen', monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.altar-buy-btn {
+  min-width: 92px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.75);
+  background: rgba(245, 158, 11, 0.2);
+  color: #fef3c7;
+  font-family: 'Silkscreen', monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.altar-buy-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.altar-buy-btn:disabled {
+  border-color: var(--border);
+  background: rgba(15, 23, 42, 0.75);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.altar-buy-btn.is-max {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(6, 78, 59, 0.42);
+  color: #6ee7b7;
+}
+
+.altar-footer-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.end-altar-embers {
+  font-family: 'Silkscreen', monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #fde68a;
+  border-top: 1px solid rgba(226, 232, 240, 0.08);
+  padding-top: 6px;
+}
+
+/* Tabella Sinergie ed Evoluzioni */
+.synergy-row {
+  background: rgba(30, 41, 59, 0.66);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--evo-accent, var(--gold));
+  border-radius: 10px;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.synergy-row.is-evolved {
+  background: linear-gradient(135deg, rgba(120, 53, 15, 0.45), rgba(30, 41, 59, 0.85));
+  border-color: rgba(251, 191, 36, 0.75);
+}
+
+.synergy-row.is-ready {
+  border-color: rgba(251, 191, 36, 0.7);
+}
+
+.synergy-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.synergy-evo-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--evo-accent, var(--gold));
+}
+
+.synergy-status-tag {
+  font-family: 'Silkscreen', monospace;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 6px;
+  border-radius: 4px;
+  border: 1px solid currentColor;
+  background: rgba(9, 13, 22, 0.82);
+  white-space: nowrap;
+}
+
+.synergy-pair-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.synergy-item-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.synergy-item-chip-icon {
+  width: 13px;
+  height: 13px;
+  display: inline-flex;
+}
+
+.synergy-plus {
+  font-family: 'Silkscreen', monospace;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.synergy-owner {
+  font-family: 'Silkscreen', monospace;
+  font-size: 9px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.synergy-desc {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.38;
   color: #cbd5e1;
 }
 

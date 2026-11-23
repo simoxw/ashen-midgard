@@ -431,3 +431,87 @@ export function getWeaponEvolutionStatus(weaponId, levels = {}, evolvedWeapons =
     accent: '#94a3b8'
   };
 }
+
+const WEAPON_OWNER_MAP = {
+  axe: { heroId: 'warrior', heroName: 'Astrid' },
+  blades: { heroId: 'warrior', heroName: 'Astrid' },
+  spear: { heroId: 'warrior', heroName: 'Astrid' },
+  dagger: { heroId: 'assassin', heroName: 'Skadi' },
+  scythe: { heroId: 'assassin', heroName: 'Skadi' },
+  fangs: { heroId: 'assassin', heroName: 'Skadi' },
+  orb: { heroId: 'mage', heroName: 'Freya' },
+  lightning: { heroId: 'mage', heroName: 'Freya' },
+  grimoire: { heroId: 'mage', heroName: 'Freya' },
+  hammer: { heroId: 'juggernaut', heroName: 'Bjorn' },
+  aura: { heroId: 'juggernaut', heroName: 'Bjorn' },
+  flail: { heroId: 'juggernaut', heroName: 'Bjorn' }
+};
+
+export function getSynergyMatrix(levels = {}, evolvedWeapons = {}, heroFilter = 'all', isRunActive = false) {
+  const rows = [];
+  for (const weaponId of Object.keys(WEAPON_EVOLUTIONS)) {
+    const owner = WEAPON_OWNER_MAP[weaponId] || { heroId: 'warrior', heroName: 'Astrid' };
+    if (heroFilter && heroFilter !== 'all' && owner.heroId !== heroFilter) continue;
+
+    const weaponCfg = UPGRADE_CATALOG.find((u) => u.id === weaponId);
+    const passiveCfg = UPGRADE_CATALOG.find((u) => u.id === WEAPON_EVOLUTIONS[weaponId].passiveId);
+    const evo = WEAPON_EVOLUTIONS[weaponId];
+    const evoStatus = getWeaponEvolutionStatus(weaponId, levels, evolvedWeapons);
+    const wLv = levels[weaponId] || 0;
+    const pLv = levels[evo.passiveId] || 0;
+
+    let stateLabel = 'Lv.5 + Passiva';
+    let stateKind = 'idle';
+    let stateColor = '#94a3b8';
+
+    if (isRunActive) {
+      if (evoStatus.status === 'evolved') {
+        stateLabel = 'EVOLUTA';
+        stateKind = 'evolved';
+        stateColor = '#fbbf24';
+      } else if (evoStatus.status === 'chest_ready') {
+        stateLabel = 'PRONTA AL FORZIERE';
+        stateKind = 'ready';
+        stateColor = '#fbbf24';
+      } else if (evoStatus.status === 'needs_passive') {
+        stateLabel = `MANCA ${passiveCfg?.name?.split(' ')[0]?.toUpperCase() || 'PASSIVA'}`;
+        stateKind = 'missing_passive';
+        stateColor = '#f87171';
+      } else if (wLv > 0) {
+        stateLabel = pLv > 0 ? `ARMA LV ${wLv}/5` : `LV ${wLv}/5`;
+        stateKind = 'in_progress';
+        stateColor = pLv > 0 ? '#38bdf8' : '#cbd5e1';
+      } else if (pLv > 0) {
+        stateLabel = 'PASSIVA OK';
+        stateKind = 'passive_only';
+        stateColor = '#38bdf8';
+      } else {
+        stateLabel = 'NON TROVATA';
+        stateKind = 'unowned';
+        stateColor = '#64748b';
+      }
+    }
+
+    rows.push({
+      weaponId,
+      weaponName: weaponCfg?.name || weaponId,
+      weaponAccent: weaponCfg?.accent || '#f59e0b',
+      weaponLevel: wLv,
+      passiveId: evo.passiveId,
+      passiveName: passiveCfg?.name || evo.passiveId,
+      passiveAccent: passiveCfg?.accent || '#38bdf8',
+      passiveLevel: pLv,
+      evolutionId: evo.id,
+      evolutionName: evo.name,
+      evolutionDesc: evo.description,
+      evolutionAccent: evo.accent,
+      heroId: owner.heroId,
+      heroName: owner.heroName,
+      stateLabel,
+      stateKind,
+      stateColor
+    });
+  }
+  return rows;
+}
+

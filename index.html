@@ -38,7 +38,7 @@
     />
 
     <!-- Phaser 3 via CDN ufficiale -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js" crossorigin="anonymous"></script>
 
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -67,6 +67,7 @@
 
           <div id="hud-build-strip"></div>
           <div id="hud-buff-bar" class="hidden"></div>
+          <div id="hud-revival-tag" class="hud-revival-tag hidden">RINASCITA ATTIVA</div>
 
           <div id="boss-hud" class="hidden">
             <div class="boss-hud-row">
@@ -191,8 +192,10 @@
           <div class="actions-stack">
             <button type="button" id="play-btn" class="btn-primary">GIOCA</button>
             <div class="secondary-actions-row">
-              <button type="button" id="title-mute-btn" class="btn-secondary">Audio: Attivo</button>
+              <button type="button" id="altar-btn" class="btn-secondary">Altare Rune (0)</button>
+              <button type="button" id="title-synergy-btn" class="btn-secondary">Sinergie (12)</button>
               <button type="button" id="codex-btn" class="btn-secondary">Codex Rune</button>
+              <button type="button" id="title-mute-btn" class="btn-secondary">Audio: Attivo</button>
               <button type="button" id="pwa-install-btn" class="btn-install hidden">
                 Installa App su Schermata Home
               </button>
@@ -236,12 +239,45 @@
           </div>
         </div>
 
+        <!-- Modale Altare delle Rune -->
+        <div id="altar-modal" class="modal-backdrop">
+          <div class="modal-panel codex-panel">
+            <div class="codex-header">
+              <h2 class="modal-title" style="text-align:left">ALTARE DELLE RUNE</h2>
+              <span id="altar-embers-balance" class="altar-balance-badge">0 BRACI</span>
+            </div>
+            <p id="altar-summary-bar" class="altar-summary-bar"></p>
+            <div id="altar-rune-list" class="codex-list"></div>
+            <div class="altar-footer-actions">
+              <button type="button" id="altar-refund-btn" class="btn-danger">Rimborsa Tutto</button>
+              <button type="button" id="altar-close-btn" class="btn-secondary">Chiudi</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modale Tabella Sinergie ed Evoluzioni -->
+        <div id="synergy-modal" class="modal-backdrop">
+          <div class="modal-panel codex-panel">
+            <div class="codex-header">
+              <h2 class="modal-title" style="text-align:left">SINERGIE &amp; EVOLUZIONI</h2>
+              <span id="synergy-summary" class="codex-progress">12 ARMI</span>
+            </div>
+            <p class="modal-sub" style="text-align:left;font-size:12px">
+              Porta un'arma al Lv.5 e possiedi almeno Lv.1 della passiva gemella, poi ottieni l'Evoluzione al Level-Up o nel Forziere.
+            </p>
+            <div id="synergy-tabs" class="codex-tabs"></div>
+            <div id="synergy-list" class="codex-list"></div>
+            <button type="button" id="synergy-close-btn" class="btn-secondary">Chiudi</button>
+          </div>
+        </div>
+
         <!-- Modale Pausa -->
         <div id="pause-modal" class="modal-backdrop">
           <div class="modal-panel">
             <h2 class="modal-title">PAUSA</h2>
             <div id="pause-build-list"></div>
             <button type="button" id="resume-btn" class="btn-primary">RIPRENDI</button>
+            <button type="button" id="pause-synergy-btn" class="btn-secondary">Tabella Sinergie</button>
             <button type="button" id="pause-settings-btn" class="btn-secondary">Impostazioni</button>
             <button type="button" id="pause-mute-btn" class="btn-secondary">Audio: Attivo</button>
             <button type="button" id="restart-btn" class="btn-secondary">Ricomincia Partita</button>
@@ -279,6 +315,7 @@
               </div>
               <div id="end-meta-levelup" class="hidden">NUOVO GRADO RAGGIUNTO!</div>
               <div id="end-meta-unlocks" class="hidden"></div>
+              <div id="end-altar-embers" class="end-altar-embers">+0 Braci Runiche</div>
               <div id="end-codex-unlocks" class="hidden"></div>
               <div id="end-realm-unlock" class="hidden"></div>
             </div>

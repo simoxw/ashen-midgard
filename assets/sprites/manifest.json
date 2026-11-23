@@ -1,11 +1,43 @@
 {
-  "enabled": [],
-  "available": [
-    "hero",
-    "enemy_swarm",
-    "enemy_tank",
+  "enabled": [
+    "hero_warrior",
+    "hero_assassin",
+    "hero_mage",
+    "hero_juggernaut",
     "boss",
-    "ground_tile",
-    "prop_tree"
+    "boss_surtr",
+    "boss_hel",
+    "boss_loki",
+    "boss_odin",
+    "enemy_swarm",
+    "enemy_fast",
+    "enemy_tank",
+    "enemy_archer",
+    "enemy_berserker",
+    "enemy_elite",
+    "prop_tree",
+    "prop_rock",
+    "prop_shrine"
+  ],
+  "available": [
+    "hero_warrior",
+    "hero_assassin",
+    "hero_mage",
+    "hero_juggernaut",
+    "boss",
+    "boss_surtr",
+    "boss_hel",
+    "boss_loki",
+    "boss_odin",
+    "enemy_swarm",
+    "enemy_fast",
+    "enemy_tank",
+    "enemy_archer",
+    "enemy_berserker",
+    "enemy_elite",
+    "prop_tree",
+    "prop_rock",
+    "prop_shrine",
+    "ground_tile"
   ]
 }
